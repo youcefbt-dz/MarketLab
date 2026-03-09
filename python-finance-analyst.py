@@ -1,45 +1,11 @@
 import yfinance as yf
 import pandas as pd
 import matplotlib.pyplot as plt
-import json
-import os
+import json 
+import pandas_ta as ta
 
-name_to_ticker = {
-    'APPLE': 'AAPL',
-    'GOOGLE': 'GOOGL',
-    'MICROSOFT': 'MSFT',
-    'TESLA': 'TSLA',
-    'AMAZON': 'AMZN',
-    'META': 'META',
-    'NETFLIX': 'NFLX',
-    'NVIDIA': 'NVDA',
-    'AMD': 'AMD',
-    'INTEL': 'INTC',
-    'IBM': 'IBM',
-    'ORACLE': 'ORCL',
-    'ADOBE': 'ADBE',
-    'SPOTIFY': 'SPOT',
-    'UBER': 'UBER',
-    'AIRBNB': 'ABNB',
-    'PAYPAL': 'PYPL',
-    'JPMORGAN': 'JPM',
-    'GOLDMAN': 'GS',
-    'VISA': 'V',
-    'MASTERCARD': 'MA',
-    'BLACKROCK': 'BLK',
-    'PFIZER': 'PFE',
-    'JOHNSON': 'JNJ',
-    'MODERNA': 'MRNA',
-    'EXXON': 'XOM',
-    'CHEVRON': 'CVX',
-    'COCACOLA': 'KO',
-    'PEPSI': 'PEP',
-    'MCDONALDS': 'MCD',
-    'NIKE': 'NKE',
-    'DISNEY': 'DIS',
-    'WALMART': 'WMT',
-    'STARBUCKS': 'SBUX',
-}
+with open('companies.json', 'r') as f:
+    name_to_ticker = json.load(f)
 
 while True:
     try:
@@ -49,7 +15,6 @@ while True:
         print("Please enter a valid number!")
 
 tickers = []
-
 for i in range(num):
     while True:
         name = input(f"Enter company {i+1} name or ticker: ").upper()
@@ -62,8 +27,6 @@ for i in range(num):
         except:
             print(f"'{name}' not found! Please enter a valid company name.")
 
-print(tickers)
-
 for ticker in tickers:
     stock = yf.Ticker(ticker)
     info = stock.info
@@ -74,18 +37,24 @@ for ticker in tickers:
     print(f"52W Low: ${info['fiftyTwoWeekLow']}")
 
 all_data = {}
-
 for ticker in tickers:
     stock = yf.Ticker(ticker)
     history = stock.history(period='5y')
     df = pd.DataFrame(history)
     df['MA50'] = df['Close'].rolling(window=50).mean()
     df['MA200'] = df['Close'].rolling(window=200).mean()
+    df['RSI'] = ta.rsi(df['Close'], length=14)
+    print(f"Current RSI: {df['RSI'].iloc[-1]:.2f}")
     all_data[ticker] = df
 
-fig, axes = plt.subplots(1, len(tickers), figsize=(15, 5))
-for i, ticker in enumerate(tickers):
-    all_data[ticker][['Close', 'MA50', 'MA200']].plot(ax=axes[i], title=ticker)
-
-plt.tight_layout()
-plt.show()
+for ticker in tickers:
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8), sharex=True)
+    
+    all_data[ticker][['Close', 'MA50', 'MA200']].plot(ax=ax1, title=ticker)
+    all_data[ticker]['RSI'].plot(ax=ax2, title='RSI', color='purple')
+    
+    ax2.axhline(y=70, color='red', linestyle='--')    
+    ax2.axhline(y=30, color='green', linestyle='--')  
+    
+    plt.tight_layout()
+    plt.show()
