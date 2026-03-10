@@ -1,33 +1,48 @@
 #  Stock Portfolio Analyzer
-> Version 1.2.1 | Python & Financial Data Analysis
+> Version 1.3 | Python & Financial Data Analysis
 
-A command-line tool that analyzes real stock market data in real-time.
-Enter any company name and get instant financial insights.
+---
 
-##  What it does
-- Fetches real-time stock prices from Yahoo Finance
-- Compares multiple stocks side by side
-- Calculates Moving Averages (MA50, MA200) to identify trends
-- RSI Indicator to identify buy/sell opportunities
-- Visualizes stock performance over 5 years
-- Handles invalid company names gracefully
+##  About
+A professional command-line tool that fetches and analyzes **real stock market data** in real-time.
+Built for finance students and analysts who want to combine **Python + Financial Theory**.
 
-##  Built with
-- Python
-- Pandas
-- Matplotlib
-- yfinance
-- pandas-ta
+---
+
+##  Features
+| Feature | Description |
+|---------|-------------|
+|  Real-time Data | Live stock prices from Yahoo Finance |
+|  Multi-stock | Analyze multiple stocks simultaneously |
+|  Technical Analysis | MA50, MA200, RSI Indicator |
+|  Risk Analysis | Beta, R², Systematic & Unsystematic Risk |
+|  Error Handling | Validates company names automatically |
+|  Companies Database | 50+ companies in separate JSON file |
+
+---
+
+##  Built With
+`Python` `Pandas` `Matplotlib` `yfinance` `pandas-ta` `scipy`
+
+---
 
 ##  Supported Companies
-50+ major companies including Apple, Google, Tesla, Microsoft, Amazon and more.
+50+ major companies across multiple sectors:
+- **Tech:** Apple, Google, Microsoft, Tesla, Nvidia...
+- **Finance:** JPMorgan, Goldman Sachs, Visa, Mastercard...
+- **Health:** Pfizer, Johnson & Johnson, Moderna...
+- **Energy:** ExxonMobil, Chevron...
+- **Consumer:** Nike, Disney, McDonald's, Starbucks...
+
+---
 
 ##  Roadmap
 - [x] Real-time stock data
 - [x] Multi-stock comparison
 - [x] Moving Averages (MA50, MA200)
-- [x] Error handling
 - [x] RSI Indicator
-- [x] Separate companies database (JSON)
+- [x] Beta & R² Risk Analysis
+- [x] Companies database (JSON)
+- [ ] Scatter Plot visualization
+- [ ] Automatic BUY/HOLD/SELL recommendation
 - [ ] PDF Report generation
-- [ ] Portfolio performance report
