@@ -20,6 +20,8 @@ Built for finance students and analysts who want to combine Python + Financial T
 | Clean Code | Modular functions for each analysis step |
 | Error Handling | Validates company names automatically |
 | Companies Database | 50+ companies in separate JSON file |
+| EMA Indicators | EMA20, EMA50 Exponential Moving Averages |
+| Seasonality Analysis | Best/Worst month detection with bar chart |
 
 ---
 
@@ -47,6 +49,7 @@ Built for finance students and analysts who want to combine Python + Financial T
 - [x] Companies database (JSON)
 - [x] Sharpe Ratio & Annualized Return
 - [x] Functions refactoring
-- [ ] Scatter Plot visualization
+- [x] EMA20 & EMA50 Indicators
+- [x] Seasonality Analysis (Monthly Returns)
 - [ ] Automatic BUY/HOLD/SELL recommendation
 - [ ] PDF Report generation
