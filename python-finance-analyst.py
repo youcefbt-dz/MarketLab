@@ -51,7 +51,6 @@ def get_stock_info(ticker):
     print(f"P/E Ratio: {info.get('trailingPE','N/A')}")
     return info
 
-
 def analyze_seasonality(ticker,df):
     df['Month'] = df.index.month
     df['Year'] = df.index.year
@@ -68,7 +67,6 @@ def analyze_seasonality(ticker,df):
     plt.ylabel('Averge Return %')
     plt.axhline(y=0,color='red',linestyle = '--')
     plt.tight_layout()
-    plt.show()
 
 all_data = {}
 market = yf.Ticker('^GSPC')
@@ -87,9 +85,17 @@ def calculate_indicators(ticker):
     df['EMA20'] = df['Close'].ewm(span=20).mean()
     df['EMA50'] = df['Close'].ewm(span=50).mean()
     df['RSI'] = ta.rsi(df['Close'], length=14)
+    df['BB_middle'] = df['Close'].rolling(window=20).mean()
+    df['BB_std'] = df['Close'].rolling(window=20).std()
+    df['BB_upper'] = df ['BB_middle'] + (df['BB_std']*2)
+    df['BB_lower'] = df['BB_middle'] - (df['BB_std']*2)
     print(f"\n-- MA and EMA anf RSI for {ticker} over the last {perd_str}--")
-    print(f'MA50: {df["MA50"].iloc[-1]:.2f}')
-    print(f'MA200: {df["MA200"].iloc[-1]:.2f}')
+    print(f"BB_middle: {df['BB_middle'].iloc[-1]:.2f}")
+    print(f"BB_std: {df['BB_std'].iloc[-1]:.2f}")
+    print(f"BB_upper: {df['BB_upper'].iloc[-1]:.2f}")
+    print(f"BB_lower: {df['BB_lower'].iloc[-1]:.2f}")
+    print(f"MA50: {df["MA50"].iloc[-1]:.2f}")
+    print(f"MA200: {df["MA200"].iloc[-1]:.2f}")
     print(f"EMA20: {df['EMA20'].iloc[-1]:.2f}")
     print(f"EMA50: {df['EMA50'].iloc[-1]:.2f}")
     print(f"Current RSI: {df['RSI'].iloc[-1]:.2f}")
@@ -112,8 +118,6 @@ for ticker in tickers:
 for ticker in tickers:
     all_data[ticker] = calculate_indicators(ticker)
 
-for ticker in tickers:
-    analyze_seasonality(ticker, all_data[ticker])
 
 def calculate_financial_metrics(stock_returns, market_returns, beta):
     annual_rf = 0.04
@@ -133,6 +137,27 @@ def prepare_data(stock_prices, market_prices):
     returns  = df.pct_change().dropna()
     return returns['Stock'], returns['Market']
 
+def calculate_correlation(all_data):
+    if len(all_data) < 2:
+        print("Need at least 2 stocks for correlation!")
+        return
+    returns_df = pd.DataFrame()
+    for ticker in all_data:
+        returns_df[ticker] = all_data[ticker]['Stock_Return']
+
+    corr_matrix = returns_df.corr()
+    print("\n -- Correlation Matrix --")
+    print(corr_matrix.round(3))
+
+    plt.figure(figsize=(8,6))
+    plt.imshow(corr_matrix, cmap= 'RdYlGn' , vmin=-1,vmax=1 )
+    plt.colorbar( )
+    plt.xticks(range(len(corr_matrix.columns)), corr_matrix.columns)
+    plt.yticks(range(len(corr_matrix.columns)), corr_matrix.columns)
+    plt.title("Cross-Correlation Matrix")
+    plt.tight_layout()
+    plt.show()
+
 
 for ticker in tickers:
     df = all_data[ticker]
@@ -145,15 +170,32 @@ for ticker in tickers:
 
 
 def plot_stock(ticker):
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8), sharex=True)
-    all_data[ticker][['Close', 'MA200','MA50','EMA20', 'EMA50']].plot(ax = ax1 , title = ticker)
-    all_data[ticker]['RSI'].plot(ax = ax2 , title = 'RSI', color = 'purple')
-    
-    ax2.axhline(y=70, color='red', linestyle='--')    
-    ax2.axhline(y=30, color='green', linestyle='--')  
-    
+    df = all_data[ticker]
+
+    plt.figure(figsize =(12,5))
+    df[['Close', 'MA200','MA50','EMA20', 'EMA50']].plot(ax=plt.gca())
+    plt.title(f' {ticker} - Price & Moving Averages')
+    plt.tight_layout()
+    plt.show()
+
+    plt.figure(figsize = (12,5))
+    df[['Close' , 'BB_middle' , 'BB_lower' , 'BB_upper']].plot(ax=plt.gca())
+    plt.title("Bollinger Bands")
+    plt.tight_layout()
+    plt.show()
+
+    plt.figure(figsize = (12,5))
+    df['RSI'].plot(color = 'purple',ax=plt.gca())
+    plt.axhline(y=70, color = 'green', linestyle = '--')
+    plt.axhline(y = 30, color = 'red', linestyle = '--')
+    plt.title(f'{ticker} - RSI')
     plt.tight_layout()
     plt.show()
 
 for ticker in tickers:
     plot_stock(ticker)
+
+for ticker in tickers:
+    analyze_seasonality(ticker, all_data[ticker])
+
+calculate_correlation(all_data)
