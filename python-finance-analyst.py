@@ -6,6 +6,7 @@ import pandas_ta as ta
 from scipy import stats
 import numpy as np
 
+
 with open('companies.json', 'r') as f:
     name_to_ticker = json.load(f)
 
@@ -89,6 +90,15 @@ def calculate_indicators(ticker):
     df['BB_std'] = df['Close'].rolling(window=20).std()
     df['BB_upper'] = df ['BB_middle'] + (df['BB_std']*2)
     df['BB_lower'] = df['BB_middle'] - (df['BB_std']*2)
+    df['MACD'] = df['Close'].ewm(span = 12).mean() - df['Close'].ewm(span = 26).mean()
+    df['Signal'] = df["MACD"].ewm(span = 9).mean()
+    df["Histogram"] =df['MACD'] - df['Signal']
+    df['L14'] = df['Low'].rolling(window=14).min()
+    df['H14'] = df['High'].rolling(window=14).max()
+    df['%K'] = ((df['Close'] - df['L14']) / (df['H14'] - df['L14'])) * 100
+    df['%D'] = df['%K'].rolling(window=3).mean()
+
+
     print(f"\n-- MA and EMA anf RSI for {ticker} over the last {perd_str}--")
     print(f"BB_middle: {df['BB_middle'].iloc[-1]:.2f}")
     print(f"BB_std: {df['BB_std'].iloc[-1]:.2f}")
@@ -99,6 +109,13 @@ def calculate_indicators(ticker):
     print(f"EMA20: {df['EMA20'].iloc[-1]:.2f}")
     print(f"EMA50: {df['EMA50'].iloc[-1]:.2f}")
     print(f"Current RSI: {df['RSI'].iloc[-1]:.2f}")
+    print(f"MACD: {df['MACD'].iloc[-1]: .4f}")
+    print(f"Signal: {df['Signal'].iloc[-1]:.4f}")
+    print(f"Histogram: {df['Histogram'].iloc[-1]:.4f}")
+    print(f"%K: {df['%K'].iloc[-1]:.2f}")
+    print(f"%D: {df['%D'].iloc[-1]:.2f}")
+
+
     df['Stock_Return'] = df['Close'].pct_change()
     combined = pd.concat([df['Stock_Return'], market_df['Market_Return']], axis=1).dropna()
     combined.columns = ['Stock_Return', 'Market_Return']
@@ -191,6 +208,27 @@ def plot_stock(ticker):
     plt.title(f'{ticker} - RSI')
     plt.tight_layout()
     plt.show()
+
+    plt.figure(figsize=(12,5))
+    df['MACD'].plot(label= 'MACD', color ='blue')
+    df['Signal'].plot(label = 'Signal', color = 'orange')
+    plt.bar(df.index, df['Histogram'],label = 'Histogram', color = 'black',alpha = 0.3)
+    plt.axhline(y=0,color = 'red', linestyle = '--')
+    plt.title(f"{ticker} - MACD")
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+    plt.figure(figsize=(12, 5))
+    df['%K'].plot(label='%K', color='blue')
+    df['%D'].plot(label='%D', color='orange')
+    plt.axhline(y=80, color='red', linestyle='--', label='Overbought')
+    plt.axhline(y=20, color='green', linestyle='--', label='Oversold')
+    plt.title(f'{ticker} - Stochastic Oscillator')
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
 
 for ticker in tickers:
     plot_stock(ticker)
