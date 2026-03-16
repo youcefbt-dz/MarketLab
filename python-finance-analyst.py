@@ -5,7 +5,7 @@ import json
 import pandas_ta as ta
 from scipy import stats
 import numpy as np
-
+from signals import generate_signal
 
 with open('companies.json', 'r') as f:
     name_to_ticker = json.load(f)
@@ -237,3 +237,27 @@ for ticker in tickers:
     analyze_seasonality(ticker, all_data[ticker])
 
 calculate_correlation(all_data)
+
+stock_info = {}
+for ticker in tickers:
+    stock_info[ticker] = get_stock_info(ticker)
+
+all_metrics = {}
+for ticker in tickers:
+    df = all_data[ticker]
+    stock_returns, market_returns = prepare_data(df['Close'], market_df['Close'])
+    beta = stats.linregress(market_returns, stock_returns).slope
+    all_metrics[ticker] = calculate_financial_metrics(stock_returns, market_returns, beta)
+
+print("\n" + "="*50)
+for ticker in tickers:
+    df = all_data[ticker]
+    info = stock_info[ticker]
+    metrics = all_metrics[ticker]
+    result = generate_signal(df, info, metrics)
+    print(f"\n  {ticker} → {result['signal']}")
+    print(f"  Score: {result['score']}/{result['max_score']}")
+    print(f"  {'─'*40}")
+    for reason in result['reasons']:
+        print(f"  {reason}")
+    print("="*50)
