@@ -1,5 +1,5 @@
 # Stock Portfolio Analyzer
-Version 1.7 | Financial Engineering Framework | Quantitative Research
+Version 1.9 | Financial Engineering Framework | Quantitative Research
 
 ## Why this exists?
 I built this tool to help researchers and students process complex market data 
@@ -20,6 +20,7 @@ accurate insights for better financial decision-making.
 | Financial Metrics | Sharpe Ratio, Annualized Return (CAPM) |
 | Seasonality Analysis | Best/Worst month detection |
 | Correlation Matrix | Cross-asset correlation heatmap |
+| Signals System | Buy/Hold/Sell with 9 indicators & scoring |
 | Error Handling | Validates company names automatically |
 | Companies Database | 50+ companies in JSON file |
 
@@ -44,11 +45,11 @@ accurate insights for better financial decision-making.
 - Seasonality Analysis
 - Cross-Correlation Matrix
 - Modular functions refactoring
+- Scoring System (BUY / HOLD / SELL) with 9 indicators
 
 ### 🔜 Coming Soon
-- Scoring System (BUY / HOLD / SELL)
-- VaR & Sortino Ratio
 - PDF Report generation
+- VaR & Sortino Ratio
 - Portfolio Optimization (Efficient Frontier)
 
 ## Contributing
