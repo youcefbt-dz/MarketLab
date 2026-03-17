@@ -1,5 +1,5 @@
 # Stock Portfolio Analyzer
-Version 1.9 | Financial Engineering Framework | Quantitative Research
+Version 2.0.0 | Financial Engineering Framework | Quantitative Research
 
 ## Why this exists?
 I built this tool to help researchers and students process complex market data 
