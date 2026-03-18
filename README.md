@@ -1,8 +1,8 @@
 <div align="center">
 
 <img src="logo.svg" alt="MarketLab" width="420"/>
-
-
+<br/>
+<br/>
 
 [![Version](https://img.shields.io/badge/version-2.1.0-378ADD?style=flat-square)](https://github.com/youcefbt-dz/python-finance-analyst)
 [![Python](https://img.shields.io/badge/python-3.10+-yellow?style=flat-square&logo=python&logoColor=white)](https://python.org)
