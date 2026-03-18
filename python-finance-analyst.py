@@ -7,7 +7,8 @@ from scipy import stats
 import numpy as np
 import warnings
 from signals import generate_signal
-
+from report_generator import  generate_pdf_report
+ 
 warnings.filterwarnings('ignore')
 plt.style.use('seaborn-v0_8-darkgrid')
 plt.rcParams['figure.figsize'] = (12, 6)
@@ -274,3 +275,6 @@ try:
     print("="*50)
 except NameError:
     pass
+
+
+generate_pdf_report(all_data, stock_info, all_metrics, tickers)
