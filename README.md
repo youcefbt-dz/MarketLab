@@ -1,6 +1,6 @@
 <div align="center">
 
-![MarketLab](https://capsule-render.vercel.app/api?type=waving&color=0:0d1117,50:1a3a5c,100:378ADD&height=180&section=header&text=MarketLab&fontSize=60&fontColor=ffffff&fontAlignY=45&desc=Quantitative%20Research%20Framework&descSize=18&descAlignY=65)
+<img src="logo.svg" alt="MarketLab" width="420"/>
 
 [![Version](https://img.shields.io/badge/version-2.1.0-378ADD?style=flat-square)](https://github.com/youcefbt-dz/python-finance-analyst)
 [![Python](https://img.shields.io/badge/python-3.10+-yellow?style=flat-square&logo=python&logoColor=white)](https://python.org)
@@ -24,13 +24,13 @@ MarketLab is built for **finance students, researchers, and analysts** who want 
 
 ## Features
 ```
- Technical Analysis     →  MA, EMA, RSI, MACD, Bollinger Bands, Stochastic
- Risk Metrics           →  Beta, R², Sharpe Ratio, Volatility
- Signals System         →  BUY / HOLD / SELL with trend filter & scoring
- Seasonality Analysis   →  Best/Worst month detection
- Correlation Matrix     →  Cross-asset heatmap
- PDF Reports            →  Automated professional report generation
- 50+ Companies          →  Pre-loaded company database
+📊 Technical Analysis     →  MA, EMA, RSI, MACD, Bollinger Bands, Stochastic
+📈 Risk Metrics           →  Beta, R², Sharpe Ratio, Volatility
+🤖 Signals System         →  BUY / HOLD / SELL with trend filter & scoring
+📅 Seasonality Analysis   →  Best/Worst month detection
+🔗 Correlation Matrix     →  Cross-asset heatmap
+📄 PDF Reports            →  Automated professional report generation
+🏢 50+ Companies          →  Pre-loaded company database
 ```
 
 ---
@@ -112,8 +112,6 @@ Contributions are welcome! Read [CONTRIBUTING.md](CONTRIBUTING.md) to get starte
 ---
 
 <div align="center">
-
-![MarketLab](https://capsule-render.vercel.app/api?type=waving&color=0:378ADD,100:0d1117&height=100&section=footer)
 
 **Built by [Youcef Boutemedjet](https://github.com/youcefbt-dz) — Finance Student | Quantitative Research Enthusiast**
 
