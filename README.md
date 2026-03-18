@@ -1,58 +1,120 @@
-# Stock Portfolio Analyzer
-Version 2.0.0 | Financial Engineering Framework | Quantitative Research
+<div align="center">
 
-## Why this exists?
-I built this tool to help researchers and students process complex market data 
-more efficiently. It's about turning raw information into clear, visual, and 
-accurate insights for better financial decision-making.
+![MarketLab](https://capsule-render.vercel.app/api?type=waving&color=0:0d1117,50:1a3a5c,100:378ADD&height=180&section=header&text=MarketLab&fontSize=60&fontColor=ffffff&fontAlignY=45&desc=Quantitative%20Research%20Framework&descSize=18&descAlignY=65)
+
+[![Version](https://img.shields.io/badge/version-2.1.0-378ADD?style=flat-square)](https://github.com/youcefbt-dz/python-finance-analyst)
+[![Python](https://img.shields.io/badge/python-3.10+-yellow?style=flat-square&logo=python&logoColor=white)](https://python.org)
+[![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
+[![Open Source](https://img.shields.io/badge/open%20source-yes-brightgreen?style=flat-square)](https://github.com/youcefbt-dz)
+[![Stars](https://img.shields.io/github/stars/youcefbt-dz/python-finance-analyst?style=flat-square&color=yellow)](https://github.com/youcefbt-dz/python-finance-analyst/stargazers)
+
+**An open-source quantitative research framework for stock analysis, risk modeling, and financial decision-making.**
+
+[Getting Started](#quick-start) · [Features](#features) · [Contributing](CONTRIBUTING.md)
+
+</div>
+
+---
+
+## Overview
+
+MarketLab is built for **finance students, researchers, and analysts** who want to process complex market data efficiently. It combines technical analysis, risk metrics, and a signals system into a single modular framework — turning raw data into clear, actionable insights.
+
+---
 
 ## Features
-| Feature | Description |
-|---------|-------------|
-| Real-time Data | Live stock prices from Yahoo Finance |
-| Multi-stock | Analyze multiple stocks simultaneously |
-| Moving Averages | MA50, MA200, EMA20, EMA50 |
-| Bollinger Bands | Volatility bands with upper/lower bounds |
-| RSI Indicator | Momentum & overbought/oversold detection |
-| MACD | Trend momentum with Signal & Histogram |
-| Stochastic Oscillator | %K & %D overbought/oversold detection |
-| Risk Analysis | Beta, R², Systematic & Unsystematic Risk |
-| Financial Metrics | Sharpe Ratio, Annualized Return (CAPM) |
-| Seasonality Analysis | Best/Worst month detection |
-| Correlation Matrix | Cross-asset correlation heatmap |
-| Signals System | Buy/Hold/Sell with 9 indicators & scoring |
-| Error Handling | Validates company names automatically |
-| Companies Database | 50+ companies in JSON file |
+```
+ Technical Analysis     →  MA, EMA, RSI, MACD, Bollinger Bands, Stochastic
+ Risk Metrics           →  Beta, R², Sharpe Ratio, Volatility
+ Signals System         →  BUY / HOLD / SELL with trend filter & scoring
+ Seasonality Analysis   →  Best/Worst month detection
+ Correlation Matrix     →  Cross-asset heatmap
+ PDF Reports            →  Automated professional report generation
+ 50+ Companies          →  Pre-loaded company database
+```
 
-## 🛠️ Built With
-`Python` `Pandas` `Matplotlib` `yfinance` `pandas-ta` `scipy` `numpy`
+---
 
-## 🏢 Supported Companies
-50+ major companies across multiple sectors
+## Quick Start
+```bash
+# Clone the repo
+git clone https://github.com/youcefbt-dz/python-finance-analyst.git
+cd python-finance-analyst
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run
+python indicators.py
+```
+
+---
+
+## Project Structure
+```
+MarketLab/
+├── indicators.py        ← Main analysis engine
+├── signals.py           ← BUY / HOLD / SELL system
+├── report_generator.py  ← PDF report generation
+├── companies.json       ← 50+ supported companies
+├── requirements.txt     ← Dependencies
+└── CONTRIBUTING.md      ← Contribution guide
+```
+
+---
+
+## Example Output
+```
+==================================================
+  AAPL → STRONG BUY
+  Score: 8/15
+  ────────────────────────────────────────
+  - Price is above MA200: Long-term trend is Bullish.
+  - RSI is Oversold (28.3). Potential reversal.
+  - MACD Histogram crossed above zero: Strong Bullish reversal.
+  - Golden Cross (MA50 > MA200) active.
+==================================================
+```
+
+---
+
+## Built With
+
+<div align="center">
+
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![Pandas](https://img.shields.io/badge/Pandas-150458?style=for-the-badge&logo=pandas&logoColor=white)
+![NumPy](https://img.shields.io/badge/NumPy-013243?style=for-the-badge&logo=numpy&logoColor=white)
+![Matplotlib](https://img.shields.io/badge/Matplotlib-11557c?style=for-the-badge)
+![SciPy](https://img.shields.io/badge/SciPy-8CAAE6?style=for-the-badge&logo=scipy&logoColor=white)
+
+</div>
+
+---
 
 ## Roadmap
 
-### ✅ Completed
-- Real-time stock data
-- Multi-stock comparison
-- Moving Averages (MA50, MA200, EMA20, EMA50)
-- Bollinger Bands
-- RSI Indicator
-- MACD (Line, Signal, Histogram)
-- Stochastic Oscillator (%K, %D)
-- Beta & R² Risk Analysis
-- Sharpe Ratio & Annualized Return (CAPM)
-- Seasonality Analysis
-- Cross-Correlation Matrix
-- Modular functions refactoring
-- Scoring System (BUY / HOLD / SELL) with 9 indicators
+- [x] Technical indicators (MA, EMA, RSI, MACD, BB, Stochastic)
+- [x] Risk metrics (Beta, R², Sharpe Ratio, Volatility)
+- [x] Signals system with trend filter
+- [x] PDF report generation
+- [x] Modular architecture
+- [ ] Portfolio Optimization (Efficient Frontier)
+- [ ] VaR & Sortino Ratio
+- [ ] Machine Learning price predictions
 
-### 🔜 Coming Soon
-- PDF Report generation
-- VaR & Sortino Ratio
-- Portfolio Optimization (Efficient Frontier)
+---
 
 ## Contributing
-This project is open source and built for the research community. 
-Stars ⭐ and contributions are welcome!
-```
+
+Contributions are welcome! Read [CONTRIBUTING.md](CONTRIBUTING.md) to get started.
+
+---
+
+<div align="center">
+
+![MarketLab](https://capsule-render.vercel.app/api?type=waving&color=0:378ADD,100:0d1117&height=100&section=footer)
+
+**Built by [Youcef Boutemedjet](https://github.com/youcefbt-dz) — Finance Student | Quantitative Research Enthusiast**
+
+</div>
