@@ -4,7 +4,7 @@
 <br/>
 <br/>
 
-[![Version](https://img.shields.io/badge/version-2.1.0-378ADD?style=flat-square)](https://github.com/youcefbt-dz/python-finance-analyst)
+[![Version](https://img.shields.io/badge/version-2.1.1-378ADD?style=flat-square)](https://github.com/youcefbt-dz/python-finance-analyst)
 [![Python](https://img.shields.io/badge/python-3.10+-yellow?style=flat-square&logo=python&logoColor=white)](https://python.org)
 [![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
 [![Open Source](https://img.shields.io/badge/open%20source-yes-brightgreen?style=flat-square)](https://github.com/youcefbt-dz)
@@ -26,13 +26,13 @@ MarketLab is built for **finance students, researchers, and analysts** who want 
 
 ## Features
 ```
-📊 Technical Analysis     →  MA, EMA, RSI, MACD, Bollinger Bands, Stochastic
-📈 Risk Metrics           →  Beta, R², Sharpe Ratio, Volatility
-🤖 Signals System         →  BUY / HOLD / SELL with trend filter & scoring
-📅 Seasonality Analysis   →  Best/Worst month detection
-🔗 Correlation Matrix     →  Cross-asset heatmap
-📄 PDF Reports            →  Automated professional report generation
-🏢 50+ Companies          →  Pre-loaded company database
+ Technical Analysis     →  MA, EMA, RSI, MACD, Bollinger Bands, Stochastic
+ Risk Metrics           →  Beta, R², Sharpe Ratio, Volatility
+ Signals System         →  BUY / HOLD / SELL with trend filter & scoring
+ Seasonality Analysis   →  Best/Worst month detection
+ Correlation Matrix     →  Cross-asset heatmap
+ PDF Reports            →  Automated professional report generation
+ 50+ Companies          →  Pre-loaded company database
 ```
 
 ---
