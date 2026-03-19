@@ -6,13 +6,17 @@ import pandas_ta as ta
 from scipy import stats
 import numpy as np
 import warnings
+from thefuzz import process
 from signals import generate_signal
 from report_generator import  generate_pdf_report
- 
+
+
+
 warnings.filterwarnings('ignore')
 plt.style.use('seaborn-v0_8-darkgrid')
 plt.rcParams['figure.figsize'] = (12, 6)
 plt.rcParams['lines.linewidth'] = 1.5
+
 
 try:
     with open('companies.json', 'r') as f:
@@ -37,19 +41,35 @@ while True:
         print("Please enter a valid number!")
 
 tickers = []
+
 for i in range(num):
     while True:
-        name = input(f"Enter company {i+1} name or ticker: ").upper()
-        ticker = name_to_ticker.get(name, name)
+        name = input(f'Enter company {i+1} name or ticker: ').upper().strip()
+        
+        if name in name_to_ticker:
+            ticker = name_to_ticker[name]
+        elif name_to_ticker:
+            best_match, score = process.extractOne(name, list(name_to_ticker.keys()))
+            if score > 75:
+                question = input(f"Did you mean '{best_match}'? (y/n): ").lower()
+                if question in ('y', 'yes'):
+                    ticker = name_to_ticker[best_match]
+                else:
+                    ticker = name  
+            else:
+                ticker = name
+        else:
+            ticker = name
         try:
             stock = yf.Ticker(ticker)
-            _ = stock.fast_info['lastPrice'] 
+            _ = stock.fast_info['lastPrice']
             tickers.append(ticker)
+            print(f" Successfully added ")
             break
         except Exception:
-            print(f"'{name}' not found or network error! Please enter a valid company name.")
+            print(f"'{ticker}' not found! Please try again.")
 
-print("\nFetching Market Data (^GSPC)...")
+
 market = yf.Ticker('^GSPC')
 market_history = market.history(period=perd_str)
 market_df = pd.DataFrame(market_history)
@@ -60,10 +80,10 @@ def get_stock_info(ticker):
     fi = stock.fast_info
     
     info = {
-        'currentPrice': fi.get('lastPrice', 'N/A'),
-        'marketCap': fi.get('marketCap', 'N/A'),
-        'fiftyTwoWeekHigh': fi.get('yearHigh', 'N/A'),
-        'fiftyTwoWeekLow': fi.get('yearLow', 'N/A'),
+    'currentPrice': round(fi.get('lastPrice', 0), 2),
+    'marketCap': fi.get('marketCap', 'N/A'),
+    'fiftyTwoWeekHigh': round(fi.get('yearHigh', 0), 2),
+    'fiftyTwoWeekLow': round(fi.get('yearLow', 0), 2),
     }
     
     print(f"\n--- {ticker} Basic Info ---")
@@ -131,13 +151,13 @@ def calculate_indicators(ticker):
         combined['Stock_Return']
     )
     r_squared = r_value ** 2
-    df.attrs['beta'] = slope 
+    df.attrs['beta'] = round(slope, 4) 
     df.attrs['r_squared'] = r_squared
 
     print(f"\n-- Latest Indicator Values for {ticker} --")
     print(f"MA50: {df['MA50'].iloc[-1]:.2f} | MA200: {df['MA200'].iloc[-1]:.2f}")
     print(f"RSI: {df['RSI'].iloc[-1]:.2f} | MACD: {df['MACD'].iloc[-1]:.4f}")
-    print(f"Beta (Calculated Once): {slope:.4f}")
+    print(f"Beta (Calculated Once): {slope:.3f}")
     print(f"R² (Systematic Risk): {r_squared:.4f}")
     
     return df
@@ -155,6 +175,7 @@ def calculate_financial_metrics(stock_returns, beta):
         'Annualized Return': annualized_return,
         'Beta': beta
     }
+
 
 def calculate_correlation(all_data):
     valid_data = {k: v for k, v in all_data.items() if v is not None}
@@ -275,6 +296,8 @@ try:
     print("="*50)
 except NameError:
     pass
+
+
 
 
 generate_pdf_report(all_data, stock_info, all_metrics, tickers)
