@@ -1,6 +1,6 @@
-# Contributing to Stock Portfolio Analyzer
+# Contributing to MarketLab
 
-Thank you for your interest in contributing! 
+Thank you for your interest in contributing!
 
 ## How to Contribute
 
@@ -8,51 +8,64 @@ Thank you for your interest in contributing!
 Click the **Fork** button at the top right of this page.
 
 ### 2. Clone Your Fork
+
 ```bash
-git clone https://github.com/your-username/python-finance-analyst.git
+git clone https://github.com/your-username/MarketLab.git
 ```
 
 ### 3. Install Dependencies
+
 ```bash
 pip install -r requirements.txt
 ```
 
 ### 4. Make Your Changes
+
 - Add new indicators
 - Improve existing analysis
 - Fix bugs
 - Improve documentation
 
 ### 5. Submit a Pull Request
+
 - Describe what you changed
 - Explain why the change is useful
 
+---
+
 ## Project Structure
+
 ```
-indicators.py   ← Main analysis engine
-signals.py      ← Buy/Sell/Hold system
-report.py       ← PDF report generation
-companies.json  ← Supported companies database
-```
-
-## Ideas for Contribution
-- Add new technical indicators (ATR, OBV...)
-- Add more companies to companies.json
-- Improve the signals scoring system
-- Add new financial metrics (VaR, Sortino...)
-- Improve PDF report design
-
-## Code Style
-- Use clear variable names
-- Add comments to explain logic
-- Follow existing code structure
-
-## Questions?
-Open an issue on GitHub and we'll be happy to help! 😊
+main.py              ← Main analysis engine
+signals.py           ← Buy/Sell/Hold scoring system
+report_generator.py  ← PDF report generation
+backtest.py          ← MACD crossover backtesting
+strategy_test.py     ← Historical signal validation
+companies.json       ← Supported companies database
+requirements.txt     ← Python dependencies
 ```
 
 ---
 
-Commit message:
-```
-Add requirements.txt and CONTRIBUTING.md
+## Ideas for Contribution
+
+- Add new technical indicators (ATR, OBV, Williams %R...)
+- Add more companies to `companies.json`
+- Improve the signals scoring system
+- Add new financial metrics (VaR, Sortino Ratio...)
+- Improve PDF report design
+- Add support for non-US markets
+
+---
+
+## Code Style
+
+- Use clear variable names
+- Follow existing code structure
+- Test your changes before submitting
+
+---
+
+## Questions?
+
+Open an issue on GitHub and we'll be happy to help!
