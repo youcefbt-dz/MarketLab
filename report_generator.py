@@ -1,180 +1,314 @@
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
-from reportlab.platypus import Table, TableStyle
+from reportlab.platypus import Table, TableStyle, Paragraph
 from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from datetime import date
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import os
 
-
-
 def save_charts(ticker, df):
     charts = []
+    plt.style.use('seaborn-v0_8-darkgrid')
 
+    # 1. Price & Moving Averages
     fig, ax = plt.subplots(figsize=(12, 5))
-    ax.plot(df['Close'], label='Close', color='black')
-    ax.plot(df['MA50'], label='MA50', linestyle='--')
-    ax.plot(df['MA200'], label='MA200', linestyle='--')
-    ax.plot(df['EMA20'], label='EMA20')
-    ax.set_title(f'{ticker} - Price & Moving Averages')
-    ax.legend()
+    ax.plot(df['Close'], label='Close Price', color='#111827', linewidth=2)
+    ax.plot(df['MA50'], label='MA50 (Medium Term)', linestyle='--', color='#3B82F6', alpha=0.8)
+    ax.plot(df['MA200'], label='MA200 (Long Term)', linestyle='--', color='#EF4444', alpha=0.8)
+    ax.plot(df['EMA20'], label='EMA20 (Short Term)', color='#10B981', alpha=0.8)
+    ax.set_title(f'{ticker} - Price Action & Moving Averages', fontsize=14, fontweight='bold', color='#1F2937')
+    ax.legend(loc='upper left')
     path = f'{ticker}_ma.png'
     plt.savefig(path, dpi=150, bbox_inches='tight')
     plt.close()
     charts.append(path)
 
+    # 2. Bollinger Bands
     fig, ax = plt.subplots(figsize=(12, 5))
-    ax.plot(df['Close'], color='black', label='Close')
-    ax.plot(df['BB_upper'], color='red', alpha=0.5, label='Upper')
-    ax.plot(df['BB_lower'], color='green', alpha=0.5, label='Lower')
-    ax.fill_between(df.index, df['BB_lower'], df['BB_upper'], alpha=0.1, color='gray')
-    ax.set_title(f'{ticker} - Bollinger Bands')
-    ax.legend()
+    ax.plot(df['Close'], color='#111827', label='Close Price', linewidth=1.5)
+    ax.plot(df['BB_upper'], color='#EF4444', alpha=0.6, label='Upper Band (Resistance)')
+    ax.plot(df['BB_lower'], color='#10B981', alpha=0.6, label='Lower Band (Support)')
+    ax.fill_between(df.index, df['BB_lower'], df['BB_upper'], alpha=0.1, color='#6B7280')
+    ax.set_title(f'{ticker} - Volatility (Bollinger Bands)', fontsize=14, fontweight='bold', color='#1F2937')
+    ax.legend(loc='upper left')
     path = f'{ticker}_bb.png'
     plt.savefig(path, dpi=150, bbox_inches='tight')
     plt.close()
     charts.append(path)
 
+    # 3. RSI
     fig, ax = plt.subplots(figsize=(12, 4))
-    ax.plot(df['RSI'], color='purple', label='RSI')
-    ax.axhline(y=70, color='red', linestyle='--', label='Overbought')
-    ax.axhline(y=30, color='green', linestyle='--', label='Oversold')
-    ax.fill_between(df.index, 70, df['RSI'], where=(df['RSI'] >= 70), color='red', alpha=0.3)
-    ax.fill_between(df.index, 30, df['RSI'], where=(df['RSI'] <= 30), color='green', alpha=0.3)
-    ax.set_title(f'{ticker} - RSI')
-    ax.legend()
+    ax.plot(df['RSI'], color='#8B5CF6', label='RSI (14)', linewidth=2)
+    ax.axhline(y=70, color='#EF4444', linestyle='--', label='Overbought (>70)')
+    ax.axhline(y=30, color='#10B981', linestyle='--', label='Oversold (<30)')
+    ax.fill_between(df.index, 70, df['RSI'], where=(df['RSI'] >= 70), color='#EF4444', alpha=0.2)
+    ax.fill_between(df.index, 30, df['RSI'], where=(df['RSI'] <= 30), color='#10B981', alpha=0.2)
+    ax.set_title(f'{ticker} - Relative Strength Index (Momentum)', fontsize=14, fontweight='bold', color='#1F2937')
+    ax.legend(loc='upper left')
     path = f'{ticker}_rsi.png'
     plt.savefig(path, dpi=150, bbox_inches='tight')
     plt.close()
     charts.append(path)
 
+    # 4. MACD
     fig, ax = plt.subplots(figsize=(12, 4))
-    ax.plot(df['MACD'], label='MACD', color='blue')
-    ax.plot(df['Signal'], label='Signal', color='orange')
-    colors_hist = ['green' if v >= 0 else 'red' for v in df['Histogram']]
-    ax.bar(df.index, df['Histogram'], color=colors_hist, alpha=0.5, label='Histogram')
+    ax.plot(df['MACD'], label='MACD Line', color='#2563EB', linewidth=1.5)
+    ax.plot(df['Signal'], label='Signal Line', color='#F59E0B', linewidth=1.5)
+    colors_hist = ['#10B981' if v >= 0 else '#EF4444' for v in df['Histogram']]
+    ax.bar(df.index, df['Histogram'], color=colors_hist, alpha=0.6, label='MACD Histogram')
     ax.axhline(y=0, color='black', linewidth=0.8)
-    ax.set_title(f'{ticker} - MACD')
-    ax.legend()
+    ax.set_title(f'{ticker} - MACD (Trend & Momentum)', fontsize=14, fontweight='bold', color='#1F2937')
+    ax.legend(loc='upper left')
     path = f'{ticker}_macd.png'
     plt.savefig(path, dpi=150, bbox_inches='tight')
     plt.close()
     charts.append(path)
 
+    # 5. Stochastic
     fig, ax = plt.subplots(figsize=(12, 4))
-    ax.plot(df['%K'], label='%K', color='blue')
-    ax.plot(df['%D'], label='%D', color='orange')
-    ax.axhline(y=80, color='red', linestyle='--', label='Overbought')
-    ax.axhline(y=20, color='green', linestyle='--', label='Oversold')
-    ax.set_title(f'{ticker} - Stochastic Oscillator')
-    ax.legend()
+    ax.plot(df['%K'], label='%K (Fast)', color='#3B82F6', linewidth=1.5)
+    ax.plot(df['%D'], label='%D (Slow)', color='#F59E0B', linewidth=1.5)
+    ax.axhline(y=80, color='#EF4444', linestyle='--', label='Overbought (>80)')
+    ax.axhline(y=20, color='#10B981', linestyle='--', label='Oversold (<20)')
+    ax.set_title(f'{ticker} - Stochastic Oscillator', fontsize=14, fontweight='bold', color='#1F2937')
+    ax.legend(loc='upper left')
     path = f'{ticker}_stoch.png'
     plt.savefig(path, dpi=150, bbox_inches='tight')
     plt.close()
     charts.append(path)
 
     return charts
+
+def get_qualitative_insights(df, metrics):
+    insights = []
+    
+    # RSI Analysis
+    rsi = df['RSI'].iloc[-1]
+    if rsi >= 70:
+        insights.append(f"<b>RSI ({rsi:.2f}):</b> The Relative Strength Index indicates an <b>Overbought</b> condition. The asset may be slightly overvalued in the short term, suggesting a potential price correction or consolidation phase soon.")
+    elif rsi <= 30:
+        insights.append(f"<b>RSI ({rsi:.2f}):</b> The indicator flashes an <b>Oversold</b> signal. The stock has faced significant selling pressure and might be undervalued, potentially setting up a rebound opportunity.")
+    else:
+        insights.append(f"<b>RSI ({rsi:.2f}):</b> The momentum is currently <b>Neutral</b>. The stock is neither heavily overbought nor oversold, indicating balanced market participation.")
+
+    # MACD Analysis
+    macd = df['MACD'].iloc[-1]
+    hist = df['Histogram'].iloc[-1]
+    if macd > 0 and hist > 0:
+        insights.append("<b>MACD:</b> Positive and expanding. Buyers are in control, showing strong and accelerating <b>Bullish</b> momentum.")
+    elif macd < 0 and hist < 0:
+        insights.append("<b>MACD:</b> Negative and falling. Sellers are dominating, reflecting strong <b>Bearish</b> pressure.")
+    elif hist > 0:
+        insights.append("<b>MACD Histogram:</b> Turning positive, indicating early signs of a bullish crossover and shifting momentum in favor of buyers.")
+    
+    # Risk Metrics (Beta & Sharpe)
+    beta = metrics.get('Beta', 1.0)
+    if beta > 1.2:
+        insights.append(f"<b>Beta ({beta:.2f}):</b> High systematic risk. This stock is historically <b>more volatile than the broader market</b>. Expect larger price swings (both up and down).")
+    elif beta < 0.8:
+        insights.append(f"<b>Beta ({beta:.2f}):</b> Low systematic risk. This stock acts as a <b>defensive asset</b>, being less volatile and less sensitive to broader market movements.")
+    
+    sharpe = metrics.get('Sharpe Annualized', 0)
+    if sharpe > 1:
+        insights.append(f"<b>Sharpe Ratio ({sharpe:.2f}):</b> Excellent historical performance relative to the risk taken. The asset provides <b>superior risk-adjusted returns</b>.")
+    elif sharpe < 0:
+        insights.append(f"<b>Sharpe Ratio ({sharpe:.2f}):</b> Negative risk-adjusted returns. Historically, the risk taken has not been adequately compensated compared to a risk-free asset.")
+
+    # Moving Averages Analysis
+    close = df['Close'].iloc[-1]
+    ma200 = df['MA200'].iloc[-1]
+    if close > ma200:
+        insights.append(f"<b>Long-term Trend:</b> The current price is <b>above the 200-day Moving Average</b> (${ma200:.2f}), confirming a solid long-term macro uptrend.")
+    else:
+        insights.append(f"<b>Long-term Trend:</b> The current price is <b>below the 200-day Moving Average</b> (${ma200:.2f}), indicating structural long-term weakness.")
+
+    return insights
+
 def generate_pdf_report(all_data, stock_info, all_metrics, tickers):
     from signals import generate_signal
 
-    filename = f"Stock_Report_{date.today()}.pdf"
+    filename = f"Financial_Analysis_Report_{date.today()}.pdf"
     c = canvas.Canvas(filename, pagesize=A4)
     width, height = A4  # 595 x 842
+
+    styles = getSampleStyleSheet()
+    
+    insight_style = ParagraphStyle(
+        'Insight',
+        parent=styles['Normal'],
+        fontSize=10.5,
+        leading=16, 
+        textColor=colors.HexColor("#374151"),
+        spaceAfter=12
+    )
+
+    reason_style = ParagraphStyle(
+        'Reason',
+        parent=styles['Normal'],
+        fontSize=10.5,
+        leading=14,
+        textColor=colors.HexColor("#1F2937"),
+        bulletIndent=10,
+        leftIndent=20
+    )
 
     for ticker in tickers:
         df = all_data.get(ticker)
         if df is None:
             continue
 
-        info = stock_info[ticker]
+        info    = stock_info[ticker]
         metrics = all_metrics[ticker]
         signal_result = generate_signal(df, info, metrics)
 
+        signal     = signal_result.get('signal', 'UNKNOWN')
+        score      = signal_result.get('score', 'N/A')
+        confidence = signal_result.get('confidence_level', 'N/A')
+        reasons    = signal_result.get('reasons', [])
 
-        c.setFillColor(colors.HexColor("#031234"))
-        c.rect(0, height - 80, width, 80, fill=True, stroke=False)
-
+        # --- Header ---
+        c.setFillColor(colors.HexColor("#0F172A")) 
+        c.rect(0, height - 90, width, 90, fill=True, stroke=False)
 
         c.setFillColor(colors.white)
-        c.setFont("Helvetica-Bold", 22)
-        c.drawString(40, height - 45, "STOCK ANALYSIS REPORT")
+        c.setFont("Helvetica-Bold", 24)
+        c.drawString(40, height - 45, "EXECUTIVE SUMMARY REPORT")
         c.setFont("Helvetica", 12)
-        c.setFillColor(colors.HexColor('#9CA3AF'))
-        c.drawString(40, height - 65, f"{ticker}  |  {date.today().strftime('%B %d, %Y')}")
+        c.setFillColor(colors.HexColor('#94A3B8'))
+        c.drawString(40, height - 70, f"Ticker: {ticker}  |  Generated: {date.today().strftime('%B %d, %Y')}")
 
-        signal = signal_result['signal']
-        score = signal_result['score']
-        signal_color = colors.green if 'BUY' in signal else colors.red if 'SELL' in signal else colors.orange
+        # --- Signal Badge ---
+        signal_color = (colors.HexColor("#10B981") if 'BUY'  in signal else
+                        colors.HexColor("#EF4444") if 'SELL' in signal else
+                        colors.HexColor("#F59E0B"))
+        
         c.setFillColor(signal_color)
-        c.setFont("Helvetica-Bold", 16)
-        c.drawRightString(width - 40, height - 50, signal)
+        c.roundRect(width - 140, height - 55, 100, 30, 5, fill=True, stroke=False)
+        
         c.setFillColor(colors.white)
-        c.setFont("Helvetica", 11)
-        c.drawRightString(width - 40, height - 68, f"Score: {score}/{signal_result['max_score']}")
+        c.setFont("Helvetica-Bold", 14)
+        c.drawCentredString(width - 90, height - 45, signal)
 
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 10)
+        score_str = f"Score: {score}/100" if score != 'N/A' else "Score: N/A"
+        c.drawRightString(width - 40, height - 75, f"{score_str}  |  Confidence: {confidence}")
+
+        # --- Info Table ---
         c.setFillColor(colors.black)
         info_data = [
-            ['Metric', 'Value', 'Indicator', 'Value'],
-            ['Price', f"${info.get('currentPrice', 'N/A')}",
-             'RSI', f"{df['RSI'].iloc[-1]:.2f}"],
-            ['52W High', f"${info.get('fiftyTwoWeekHigh', 'N/A')}",
-             'MACD', f"{df['MACD'].iloc[-1]:.4f}"],
-            ['52W Low', f"${info.get('fiftyTwoWeekLow', 'N/A')}",
-             'MA50', f"{df['MA50'].iloc[-1]:.2f}"],
-            ['Beta', f"{metrics.get('Beta', 'N/A')}",
-             'MA200', f"{df['MA200'].iloc[-1]:.2f}"],
-            ['Sharpe', f"{metrics['Sharpe Annualized']:.4f}",
-             '%K', f"{df['%K'].iloc[-1]:.2f}"],
-            ['Ann. Return', f"{metrics['Annualized Return']*100:.2f}%",
-             '%D', f"{df['%D'].iloc[-1]:.2f}"],
+            ['Market Data', 'Value', 'Technical Indicators', 'Value'],
+            ['Current Price',      f"${info.get('currentPrice', 'N/A')}", 'RSI (14)',         f"{df['RSI'].iloc[-1]:.2f}"],
+            ['52-Week High',       f"${info.get('fiftyTwoWeekHigh', 'N/A')}", 'MACD',         f"{df['MACD'].iloc[-1]:.4f}"],
+            ['52-Week Low',        f"${info.get('fiftyTwoWeekLow', 'N/A')}", 'MA 50',        f"${df['MA50'].iloc[-1]:.2f}"],
+            ['Beta (Volatility)',  f"{metrics.get('Beta', 'N/A')}", 'MA 200',       f"${df['MA200'].iloc[-1]:.2f}"],
+            ['Sharpe Ratio',       f"{metrics['Sharpe Annualized']:.4f}", 'Stoch %K',     f"{df['%K'].iloc[-1]:.2f}"],
+            ['Ann. Return',        f"{metrics['Annualized Return']*100:.2f}%", 'Stoch %D',   f"{df['%D'].iloc[-1]:.2f}"],
         ]
 
-        table = Table(info_data, colWidths=[100, 100, 100, 100])
+        table = Table(info_data, colWidths=[120, 100, 140, 100])
         table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#B5CAEC")),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
-            ('ROWBACKGROUND', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F9FAFB')]),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-            ('PADDING', (0, 0), (-1, -1), 6),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#1E293B")), # Dark Slate
+            ('TEXTCOLOR',  (0, 0), (-1, 0), colors.white),
+            ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE',   (0, 0), (-1, -1), 10),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+            ('ROWBACKGROUND', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F8FAFC')]),
+            ('GRID',       (0, 0), (-1, -1), 0.5, colors.HexColor('#E2E8F0')),
+            ('PADDING',    (0, 0), (-1, -1), 8),
+            ('FONTNAME',   (0, 1), (0, -1), 'Helvetica-Bold'), 
+            ('FONTNAME',   (2, 1), (2, -1), 'Helvetica-Bold'), 
+            ('TEXTCOLOR',  (0, 1), (-1, -1), colors.HexColor("#334155")),
         ]))
 
         table.wrapOn(c, width, height)
-        table.drawOn(c, 40, height - 260)
+        table_height = table._height
+        y_position = height - 120 - table_height
+        table.drawOn(c, (width - 460) / 2, y_position) 
 
-        c.setFont("Helvetica-Bold", 12)
-        c.setFillColor(colors.black)
-        c.drawString(40, height - 285, "Signal Analysis:")
-        c.setFont("Helvetica", 10)
-        y = height - 305
-        for reason in signal_result.get('reasons', []):
-            c.drawString(50, y, f"• {reason}")
-            y -= 18
-            if y < 50:
+        y_position -= 30 
+
+        # --- Algorithm Signal Reasons ---
+        c.setFont("Helvetica-Bold", 14)
+        c.setFillColor(colors.HexColor("#0F172A"))
+        c.drawString(40, y_position, "Algorithm Triggers:")
+        
+        c.setStrokeColor(colors.HexColor("#E2E8F0"))
+        c.setLineWidth(1)
+        c.line(40, y_position - 5, width - 40, y_position - 5)
+        
+        y_position -= 25
+
+        if signal in ('ERROR', 'WAIT'):
+            c.setFillColor(colors.red if signal == 'ERROR' else colors.orange)
+            c.drawString(40, y_position, f"Status Notice: {signal}")
+            y_position -= 20
+            c.setFillColor(colors.black)
+
+        for reason in reasons:
+            p = Paragraph(f"• {reason}", reason_style)
+            w, h = p.wrap(width - 80, height)
+            p.drawOn(c, 40, y_position - h)
+            y_position -= (h + 8)
+
+            if y_position < 100:
                 c.showPage()
-                y = height - 50
+                y_position = height - 50
+
+        y_position -= 20
+
+        # --- Qualitative Insights (Financial Analysis) ---
+        c.setFont("Helvetica-Bold", 14)
+        c.setFillColor(colors.HexColor("#0F172A"))
+        c.drawString(40, y_position, "Financial & Technical Interpretation:")
+        
+        c.setStrokeColor(colors.HexColor("#E2E8F0"))
+        c.line(40, y_position - 5, width - 40, y_position - 5)
+        
+        y_position -= 25
+
+        insights = get_qualitative_insights(df, metrics)
+        for insight in insights:
+            p = Paragraph(insight, insight_style)
+            w, h = p.wrap(width - 80, height)
+            p.drawOn(c, 40, y_position - h)
+            y_position -= (h + 5)
+
+            if y_position < 60:
+                c.showPage()
+                y_position = height - 60
+
+        c.setFont("Helvetica-Oblique", 8)
+        c.setFillColor(colors.HexColor("#94A3B8"))
+        c.drawString(40, 30, "Disclaimer: This report is generated algorithmically and does not constitute financial advice.")
+
+        if signal not in ('ERROR', 'WAIT'):
+            charts = save_charts(ticker, df)
+            
+            for i in range(0, len(charts), 2):
+                c.showPage()
+                c.setFillColor(colors.HexColor('#0F172A'))
+                c.rect(0, height - 50, width, 50, fill=True, stroke=False)
+                c.setFillColor(colors.white)
+                c.setFont("Helvetica-Bold", 14)
+                c.drawString(40, height - 32, f"Technical Charts - {ticker}")
+
+                c.drawImage(charts[i], 20, height / 2 - 10, width=555, height=320, preserveAspectRatio=True)
                 
-        charts = save_charts(ticker, df)
-        for i in range(0, len(charts), 2):
-            c.showPage()
-            c.setFillColor(colors.HexColor('#111827'))
-            c.rect(0, height - 40, width, 40, fill=True, stroke=False)
-            c.setFillColor(colors.white)
-            c.setFont("Helvetica-Bold", 12)
-            c.drawString(40, height - 25, f"Technical Charts - {ticker}")
-
-            c.drawImage(charts[i], 20, height/2 + 30, width=555, height=320)
-            if i + 1 < len(charts):
-                c.drawImage(charts[i+1], 20, 50, width=555, height=320)
-
+                if i + 1 < len(charts):
+                    c.drawImage(charts[i + 1], 20, 50, width=555, height=320, preserveAspectRatio=True)
+                    
+                c.setFont("Helvetica-Oblique", 8)
+                c.setFillColor(colors.HexColor("#94A3B8"))
+                c.drawString(40, 20, "Charts generated utilizing matplotlib and standard technical formulas.")
         c.showPage()
 
     c.save()
-    print(f"✅ Report saved: {filename}")
+    print(f"\n[+] Professional Report successfully saved as: {filename}")
+
     for ticker in tickers:
         for ext in ['ma', 'bb', 'rsi', 'macd', 'stoch']:
             path = f'{ticker}_{ext}.png'
