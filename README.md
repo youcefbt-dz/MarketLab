@@ -27,15 +27,21 @@ MarketLab is built for **finance students, researchers, and analysts** who want 
 
 <div align="center">
 
-| Executive Summary Report | News Sentiment Analysis |
-|:---:|:---:|
-| ![Report](docs/screenshots/screenshot_report.png) | ![Sentiment](docs/screenshots/screenshot_sentiment.png) |
-| *Signal badge · Score adjustment · Market data table* | *VADER NLP · Tail Risk detection · Time-weighted scoring* |
+### 📄 Executive Summary Report
+![Report](docs/screenshots/screenshot_report.png)
+*Signal badge · Score with sentiment adjustment · Full market data table*
 
-<br/>
+---
 
+### 🧠 News Sentiment Analysis
+![Sentiment](docs/screenshots/screenshot_sentiment.png)
+*VADER NLP · Financial keyword boosting · Tail Risk detection · Time-weighted scoring*
+
+---
+
+### 📈 Technical Charts
 ![Charts](docs/screenshots/screenshot_charts.png)
-*Technical charts embedded directly in the PDF report — Price Action, Bollinger Bands, RSI, MACD, Stochastic*
+*Price Action · Bollinger Bands · RSI · MACD · Stochastic — embedded directly in the PDF*
 
 </div>
 
