@@ -8,15 +8,14 @@ import numpy as np
 import warnings
 from thefuzz import process
 from signals import generate_signal
-from report_generator import  generate_pdf_report
-
+from report_generator import generate_pdf_report
+from sentiment import analyze_sentiment, print_sentiment   # ← NEW
 
 
 warnings.filterwarnings('ignore')
 plt.style.use('seaborn-v0_8-darkgrid')
 plt.rcParams['figure.figsize'] = (12, 6)
 plt.rcParams['lines.linewidth'] = 1.5
-
 
 try:
     with open('companies.json', 'r') as f:
@@ -55,7 +54,7 @@ for i in range(num):
                 if question in ('y', 'yes'):
                     ticker = name_to_ticker[best_match]
                 else:
-                    ticker = name  
+                    ticker = name
             else:
                 ticker = name
         else:
@@ -80,10 +79,10 @@ def get_stock_info(ticker):
     fi = stock.fast_info
     
     info = {
-    'currentPrice': round(fi.get('lastPrice', 0), 2),
-    'marketCap': fi.get('marketCap', 'N/A'),
-    'fiftyTwoWeekHigh': round(fi.get('yearHigh', 0), 2),
-    'fiftyTwoWeekLow': round(fi.get('yearLow', 0), 2),
+        'currentPrice': round(fi.get('lastPrice', 0), 2),
+        'marketCap': fi.get('marketCap', 'N/A'),
+        'fiftyTwoWeekHigh': round(fi.get('yearHigh', 0), 2),
+        'fiftyTwoWeekLow': round(fi.get('yearLow', 0), 2),
     }
     
     print(f"\n--- {ticker} Basic Info ---")
@@ -137,10 +136,10 @@ def calculate_indicators(ticker):
     df['%K'] = ((df['Close'] - df['L14']) / (df['H14'] - df['L14'])) * 100
     df['%D'] = df['%K'].rolling(window=3).mean()
 
-    df.dropna(inplace=True) 
+    df.dropna(inplace=True)
 
     if len(df) == 0:
-        print(f"\n Warning: Not enough data for {ticker} after applying indicators (need at least 200 days for MA200).")
+        print(f"\n Warning: Not enough data for {ticker} after applying indicators.")
         return None
 
     combined = pd.concat([df['Stock_Return'], market_df['Market_Return']], axis=1).dropna()
@@ -151,7 +150,7 @@ def calculate_indicators(ticker):
         combined['Stock_Return']
     )
     r_squared = r_value ** 2
-    df.attrs['beta'] = round(slope, 4) 
+    df.attrs['beta'] = round(slope, 4)
     df.attrs['r_squared'] = r_squared
 
     print(f"\n-- Latest Indicator Values for {ticker} --")
@@ -175,7 +174,6 @@ def calculate_financial_metrics(stock_returns, beta):
         'Annualized Return': annualized_return,
         'Beta': beta
     }
-
 
 def calculate_correlation(all_data):
     valid_data = {k: v for k, v in all_data.items() if v is not None}
@@ -251,9 +249,13 @@ def plot_stock(ticker, df):
     plt.tight_layout()
     plt.show()
 
-all_data = {}
-stock_info = {}
-all_metrics = {}
+
+# ─── MAIN ANALYSIS LOOP ───────────────────────────────────────────────────────
+
+all_data      = {}
+stock_info    = {}
+all_metrics   = {}
+all_sentiment = {}   # ← NEW: store sentiment per ticker
 
 for ticker in tickers:
     stock_info[ticker] = get_stock_info(ticker)
@@ -263,13 +265,17 @@ for ticker in tickers:
     
     if df is not None:
         beta = df.attrs.get('beta', 1.0)
-        
         metrics = calculate_financial_metrics(df['Stock_Return'], beta)
         all_metrics[ticker] = metrics
         
         print(f'\n--- {ticker} Financial Metrics ---')
         print(f"Sharpe Ratio: {metrics['Sharpe Annualized']:.4f}")
         print(f"Annualized Return: {metrics['Annualized Return'] * 100:.2f}%")
+
+    # ── Sentiment Analysis ──────────────────────────────────────────────────
+    sentiment = analyze_sentiment(ticker)          # ← NEW
+    all_sentiment[ticker] = sentiment              # ← NEW
+    print_sentiment(ticker, sentiment)             # ← NEW
 
 for ticker in tickers:
     if all_data[ticker] is not None:
@@ -279,25 +285,66 @@ for ticker in tickers:
 calculate_correlation(all_data)
 
 
+# ─── SIGNAL GENERATION (with Sentiment boost) ─────────────────────────────────
+
 try:
-    print("\n" + "="*50)
+    print("\n --- Result ---")
     for ticker in tickers:
         df = all_data.get(ticker)
         if df is not None:
-            info = stock_info[ticker]
-            metrics = all_metrics[ticker]
-            
+            info      = stock_info[ticker]
+            metrics   = all_metrics[ticker]
+            sentiment = all_sentiment.get(ticker, {})
+
             result = generate_signal(df, info, metrics)
-            print(f"\n  {ticker} → {result['signal']}")
-            print(f"  Score: {result['score']}/{result.get('max_score', 'N/A')}")
-            print(f"  {'─'*40}")
+
+            # ── Sentiment override ──────────────────────────────────────────
+            # Sentiment adjusts the final score and can upgrade/downgrade signal
+            sentiment_score  = sentiment.get('score', 0)
+            sentiment_label  = sentiment.get('label', 'NEUTRAL')
+            base_score       = result.get('score', 0)
+            adjusted_score   = base_score + sentiment_score
+
+            if sentiment_score != 0:
+                result['reasons'].append(
+                    f"Sentiment: News is {sentiment_label} "
+                    f"(compound: {sentiment.get('compound', 0):.4f}, "
+                    f"score adjustment: {'+' if sentiment_score > 0 else ''}{sentiment_score})."
+                )
+
+            # Re-evaluate signal with adjusted score
+            from signals import BUY_THRESHOLD, SELL_THRESHOLD
+            is_bullish_trend = df['Close'].iloc[-1] > df['MA200'].iloc[-1]
+
+            if adjusted_score >= BUY_THRESHOLD:
+                final_signal = "STRONG BUY" if (adjusted_score >= 10 and is_bullish_trend) else "BUY"
+            elif adjusted_score <= SELL_THRESHOLD:
+                final_signal = "STRONG SELL" if (adjusted_score <= -10 and not is_bullish_trend) else "SELL"
+            else:
+                final_signal = "HOLD"
+
+            signal = result.get('signal', 'UNKNOWN')
+
+            print(f"\n  {ticker} → {final_signal}", end="")
+            if final_signal != signal:
+                print(f"  (was {signal} before sentiment)", end="")
+
+            # ── Sentiment Divergence Warning ──────────────────────────
+            sent_score = sentiment.get('score', 0)
+            if final_signal == 'HOLD' and sent_score >= 2:
+                print(f"  ⚠️  Sentiment Bullish — watch for technical confirmation", end="")
+            elif final_signal == 'HOLD' and sent_score <= -2:
+                print(f"  ⚠️  Sentiment Bearish — defensive stance advised", end="")
+            print()
+
+            if final_signal not in ('ERROR', 'WAIT'):
+                print(f"  Score: {base_score} → {adjusted_score} (after sentiment)")
+
             for reason in result.get('reasons', []):
                 print(f"  - {reason}")
-    print("="*50)
+
 except NameError:
     pass
 
 
-
-
-generate_pdf_report(all_data, stock_info, all_metrics, tickers)
+generate_pdf_report(all_data, stock_info, all_metrics, tickers, all_sentiment)
