@@ -3,15 +3,15 @@
 <br/>
 <br/>
 
-[![Version](https://img.shields.io/badge/version-2.2.0-378ADD?style=flat-square)](https://github.com/youcefbt-dz/python-finance-analyst)
-[![Python](https://img.shields.io/badge/python-3.10+-yellow?style=flat-square&logo=python&logoColor=white)](https://python.org)
+[![Version](https://img.shields.io/badge/version-2.3.0-378ADD?style=flat-square)](https://github.com/youcefbt-dz/python-finance-analyst)
+[![Python](https://img.shields.io/badge/python-3.10+-yellow?style=flat-square\&logo=python\&logoColor=white)](https://python.org)
 [![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
 [![Open Source](https://img.shields.io/badge/open%20source-yes-brightgreen?style=flat-square)](https://github.com/youcefbt-dz)
-[![Stars](https://img.shields.io/github/stars/youcefbt-dz/python-finance-analyst?style=flat-square&color=yellow)](https://github.com/youcefbt-dz/python-finance-analyst/stargazers)
+[![Stars](https://img.shields.io/github/stars/youcefbt-dz/python-finance-analyst?style=flat-square\&color=yellow)](https://github.com/youcefbt-dz/python-finance-analyst/stargazers)
 
-**An open-source quantitative research framework for stock analysis, risk modeling, and financial decision-making.**
+**An open-source quantitative research and trading framework for stock analysis, strategy validation, and financial decision-making.**
 
-[Getting Started](#quick-start) · [Features](#features) · [Contributing](CONTRIBUTING.md)
+[Getting Started](#quick-start) · [Features](#features) · [Backtesting Engine](#backtesting-engine) · [Contributing](CONTRIBUTING.md)
 
 </div>
 
@@ -19,7 +19,19 @@
 
 ## Overview
 
-MarketLab is built for **finance students, researchers, and analysts** who want to process complex market data efficiently. It combines technical analysis, risk metrics, a signals scoring system, and NLP-based news sentiment into a single modular framework — turning raw market data into clear, actionable insights with professional PDF reports.
+MarketLab is a **quantitative research and trading framework** designed for finance students, researchers, and aspiring quants.
+
+It integrates technical analysis, risk modeling, NLP-driven sentiment analysis, a rule-based signals engine, and a complete backtesting system into a single modular pipeline.
+
+The framework transforms raw market data into:
+
+* technical indicators
+* trading signals
+* strategy performance evaluation
+* risk metrics
+* professional PDF reports
+
+allowing users to move from **analysis → signals → backtesting → decision-making** in one workflow.
 
 ---
 
@@ -28,20 +40,20 @@ MarketLab is built for **finance students, researchers, and analysts** who want 
 <div align="center">
 
 ### 📄 Executive Summary Report
+
 ![Report](docs/screenshots/screenshot_report.png)
-*Signal badge · Score with sentiment adjustment · Full market data table*
 
 ---
 
 ### 🧠 News Sentiment Analysis
+
 ![Sentiment](docs/screenshots/screenshot_sentiment.png)
-*VADER NLP · Financial keyword boosting · Tail Risk detection · Time-weighted scoring*
 
 ---
 
 ### 📈 Technical Charts
+
 ![Charts](docs/screenshots/screenshot_charts.png)
-*Price Action · Bollinger Bands · RSI · MACD · Stochastic — embedded directly in the PDF*
 
 </div>
 
@@ -50,15 +62,229 @@ MarketLab is built for **finance students, researchers, and analysts** who want 
 ## Features
 
 ```
- Technical Analysis     →  MA50/200, EMA20/50, RSI, MACD, Bollinger Bands, Stochastic
- Risk Metrics           →  Beta, R², Sharpe Ratio, Annualized Return
- Signals System         →  BUY / HOLD / SELL with 9-indicator scoring engine
- News Sentiment         →  NLP analysis with Tail Risk detection & time-weighted scoring
- Seasonality Analysis   →  Best/Worst month detection
- Correlation Matrix     →  Cross-asset heatmap
- PDF Reports            →  Automated professional report (Goldman Sachs style)
- 50+ Companies          →  Pre-loaded company name-to-ticker database
+Technical Analysis     → MA50/200, EMA20/50, RSI, MACD, Bollinger Bands, Stochastic
+Risk Metrics           → Beta, R², Sharpe Ratio, Annualized Return
+
+Signals System         → BUY / HOLD / SELL with 9-indicator scoring engine
+Market Regime Filter   → Bullish / Bearish trend filtering
+
+Backtesting Engine     → Historical simulation of trading strategies
+Position Sizing        → Dynamic capital allocation per trade
+Exit Strategy          → Rule-based exit system
+Divergence Detection   → RSI / Price divergence signals
+
+News Sentiment         → NLP analysis with Tail Risk detection & time-weighted scoring
+
+Seasonality Analysis   → Best/Worst month detection
+Correlation Matrix     → Cross-asset heatmap
+
+PDF Reports            → Automated institutional-grade reports
+Dual Mode Execution    → Live mode + Backtest mode
+50+ Companies          → Preloaded company-to-ticker database
 ```
+
+---
+
+## Quick Start
+
+```bash
+# Clone repository
+git clone https://github.com/youcefbt-dz/python-finance-analyst.git
+
+cd python-finance-analyst
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Live analysis
+python main.py
+
+# Backtesting
+python main.py --mode backtest
+```
+
+---
+
+## Project Structure
+
+```
+MarketLab/
+│
+├── main.py              ← Main entry point (Live & Backtest modes)
+├── indicators.py        ← Technical analysis engine
+├── signals.py           ← Signal scoring system
+├── sentiment.py         ← News sentiment analysis
+├── backtest.py          ← Backtesting engine
+├── report_generator.py  ← PDF report generation
+├── companies.json       ← Company database
+├── requirements.txt
+└── CONTRIBUTING.md
+```
+
+---
+
+## Signals System
+
+The scoring engine evaluates **9 independent market conditions**.
+
+| Condition            | Max Score |
+| -------------------- | --------- |
+| Price vs MA200       | ±2        |
+| Golden / Death Cross | ±1        |
+| RSI + Stochastic     | ±4        |
+| Stochastic crossover | ±1        |
+| MACD Histogram       | ±2        |
+| Bollinger Band touch | ±2        |
+| Volume confirmation  | ±2        |
+| Sharpe Ratio         | ±2        |
+| News Sentiment       | ±3        |
+
+```
+Score ≥ 7  → BUY
+Score ≤ -7 → SELL
+Otherwise  → HOLD
+```
+
+Market regime and sentiment adjust the final decision.
+
+---
+
+## Backtesting Engine
+
+MarketLab includes a **complete backtesting system** for evaluating strategies on historical data.
+
+### Capabilities
+
+* historical trade simulation
+* dynamic position sizing
+* entry and exit logic
+* regime-based filtering
+* divergence-based signals
+* performance tracking
+
+### Performance Metrics
+
+```
+Total Return
+Win Rate
+Sharpe Ratio
+Max Drawdown
+Number of Trades
+Average Trade
+```
+
+This allows realistic validation of trading strategies before live execution.
+
+---
+
+## Execution Modes
+
+### Live Mode
+
+```
+python main.py
+```
+
+Runs:
+
+* technical indicators
+* signals
+* sentiment
+* PDF report
+
+---
+
+### Backtest Mode
+
+```
+python main.py --mode backtest
+```
+
+Runs:
+
+* historical simulation
+* trade execution
+* performance evaluation
+
+---
+
+## News Sentiment Engine
+
+Features:
+
+* VADER NLP
+* financial keyword boosting
+* time-weighted scoring
+* tail risk detection
+* confidence scoring
+* retry system
+
+Sentiment adjusts signal strength and risk exposure.
+
+---
+
+## Built With
+
+* Python
+* Pandas
+* NumPy
+* Matplotlib
+* SciPy
+* ReportLab
+* VADER NLP
+
+---
+
+## Roadmap
+
+* [x] Technical indicators
+
+* [x] Risk metrics
+
+* [x] Signals system
+
+* [x] News sentiment
+
+* [x] PDF reports
+
+* [x] Backtesting engine
+
+* [x] Position sizing
+
+* [x] Market regime filter
+
+* [x] Exit strategy
+
+* [x] Divergence detection
+
+* [ ] Portfolio optimization
+
+* [ ] Efficient frontier
+
+* [ ] VaR & Sortino
+
+* [ ] FinBERT integration
+
+* [ ] Streamlit dashboard
+
+* [ ] API support
+
+---
+
+## Contributing
+
+Contributions are welcome.
+
+Read **CONTRIBUTING.md** to get started.
+
+---
+
+<div align="center">
+
+**Built by Youcef Boutemedjet**
+Finance Student | Quantitative Research Enthusiast
+
+</div>
 
 ---
 
