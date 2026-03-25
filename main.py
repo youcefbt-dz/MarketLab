@@ -18,8 +18,8 @@ plt.rcParams["lines.linewidth"] = 1.5
 
 # ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
-BAR      = "═" * 58
-THIN_BAR = "─" * 58
+BAR      = "-" * 60
+THIN_BAR = "-" * 60
 
 SIGNAL_ICONS = {
     "STRONG BUY":  "🟢",
@@ -214,7 +214,12 @@ def print_metrics(ticker: str, metrics: dict) -> None:
 
 # ─── CHARTS ───────────────────────────────────────────────────────────────────
 
-def analyze_seasonality(ticker: str, df: pd.DataFrame) -> None:
+def analyze_seasonality(ticker: str, df: pd.DataFrame) -> str | None:
+    """
+    Print and display the seasonality chart.
+    Returns the saved chart path so report_generator can embed it,
+    or None on failure.
+    """
     try:
         monthly          = df.copy()
         monthly["Month"] = monthly.index.month
@@ -230,10 +235,17 @@ def analyze_seasonality(ticker: str, df: pd.DataFrame) -> None:
         ax.set_title(f"{ticker} — Average Monthly Return (%)", fontsize=14, fontweight="bold")
         ax.set_xlabel("Month"); ax.set_ylabel("Avg Return (%)")
         ax.axhline(0, color="red", linestyle="--", linewidth=2)
-        plt.xticks(rotation=0); plt.tight_layout(); plt.show()
+        plt.xticks(rotation=0); plt.tight_layout()
+
+        path = f"{ticker}_seasonality.png"
+        plt.savefig(path, dpi=150, bbox_inches="tight")
+        plt.show()
+        plt.close()
+        return path
 
     except Exception as e:
         print(f"  ⚠  Could not plot seasonality for {ticker}: {e}")
+        return None
 
 def calculate_correlation(all_data: dict) -> None:
     valid = {k: v for k, v in all_data.items() if v is not None}
@@ -307,8 +319,8 @@ def plot_stock(ticker: str, df: pd.DataFrame) -> None:
 
 # ─── SIGNAL LOGIC ─────────────────────────────────────────────────────────────
 
-def compute_final_signal(df: pd.DataFrame, info: dict, metrics: dict, sentiment: dict) -> dict:
-    result         = generate_signal(df, info, metrics)
+def compute_final_signal(df: pd.DataFrame, info: dict, metrics: dict, sentiment: dict, market_returns: 'pd.Series | None' = None) -> dict:
+    result         = generate_signal(df, info, metrics, market_returns)
     base_score     = result.get("score", 0)
     sent_score     = sentiment.get("score", 0)
     adjusted_score = base_score + sent_score
@@ -361,6 +373,23 @@ def main() -> None:
     print(BAR)
 
     name_to_ticker = load_companies()
+
+    # ── Mode selection ────────────────────────────────────────────────────────
+    print()
+    print("  Select mode:")
+    print("    [1]  Live Analysis   — current data + signals + PDF report")
+    print("    [2]  Backtesting     — historical simulation + strategy accuracy")
+    print()
+    while True:
+        mode = input("  Your choice [1/2]: ").strip()
+        if mode in ("1", "2"):
+            break
+        print("    ✗  Enter 1 or 2.")
+
+    if mode == "2":
+        from backtest import main as run_backtest_main
+        run_backtest_main()
+        return
 
     print()
     num      = prompt_int("Number of stocks to analyze", 1, 20)
@@ -428,10 +457,13 @@ def main() -> None:
         print_sentiment(ticker, sentiment)
 
     # ── Charts ────────────────────────────────────────────────────────────────
+    seasonality_charts = {}
     for ticker in tickers:
         if all_data.get(ticker) is not None:
             plot_stock(ticker, all_data[ticker])
-            analyze_seasonality(ticker, all_data[ticker])
+            path = analyze_seasonality(ticker, all_data[ticker])
+            if path:
+                seasonality_charts[ticker] = path
 
     calculate_correlation(all_data)
 
@@ -444,14 +476,15 @@ def main() -> None:
         res = compute_final_signal(
             df, stock_info[ticker],
             all_metrics.get(ticker, {}),
-            all_sentiment.get(ticker, {})
+            all_sentiment.get(ticker, {}),
+            market_returns
         )
         print_signal(ticker, res)
 
     # ── PDF Report ────────────────────────────────────────────────────────────
     print(f"\n{THIN_BAR}")
     print("  Generating PDF report…")
-    generate_pdf_report(all_data, stock_info, all_metrics, tickers, all_sentiment)
+    generate_pdf_report(all_data, stock_info, all_metrics, tickers, all_sentiment, seasonality_charts)
     print("  ✔  Report saved successfully.")
     print(f"{THIN_BAR}\n")
 
