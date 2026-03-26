@@ -249,9 +249,7 @@ Max Profit: 38 × ($507.50 - $450) = $2,185
 
 ---
 
-## 🎓 Academic Justification
-
-**For Graduate School Application:**
+## 🎓 Justification
 
 > "I implemented the Kelly Criterion-inspired dynamic position sizing, where allocation scales with signal confidence (35% for high-conviction vs 15% for weak signals). Empirical testing showed this improved the Sharpe Ratio by 20% while maintaining disciplined risk management through Bollinger Band-based stop losses. The system's R-Multiple tracking (avg: 2.18) confirms that realized risk/reward exceeds the theoretical 1:2.3 target, validating the strategy's edge."
 
