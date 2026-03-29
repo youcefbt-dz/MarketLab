@@ -1,4 +1,3 @@
-import yfinance as yf
 import pandas as pd
 import matplotlib.pyplot as plt
 import json
@@ -10,6 +9,9 @@ from thefuzz import process
 from signals import generate_signal, BUY_THRESHOLD, SELL_THRESHOLD
 from report_generator import generate_pdf_report
 from sentiment import analyze_sentiment, print_sentiment
+from stock_warehouse import load_local, warehouse_status
+from pathlib import Path
+from datetime import datetime
 
 warnings.filterwarnings("ignore")
 plt.style.use("seaborn-v0_8-darkgrid")
@@ -78,45 +80,59 @@ def resolve_ticker(raw: str, name_to_ticker: dict) -> str:
     return name
 
 def validate_ticker(ticker: str) -> bool:
+    """Check if ticker exists in local warehouse."""
     try:
-        _ = yf.Ticker(ticker).fast_info["lastPrice"]
+        load_local(ticker)
         return True
-    except Exception:
+    except FileNotFoundError:
         return False
 
-# ─── DATA FETCHING ────────────────────────────────────────────────────────────
+# ─── DATA FETCHING (LOCAL) ────────────────────────────────────────────────────
 
-def get_market_returns(period: str) -> pd.Series:
-    df = yf.Ticker("^GSPC").history(period=period)
-    return df["Close"].pct_change().rename("Market_Return")
-
-def fetch_ticker_data(ticker: str, period: str) -> tuple[dict, pd.DataFrame | None]:
-    """
-    Fetch all data for a ticker in a single call.
-    Returns (info_dict, history_df) to avoid multiple round-trips.
-    """
-    stock = yf.Ticker(ticker)
-
-    # ── fast_info (one request) ──────────────────────────────────────────────
-    fi = stock.fast_info
-    info = {
-        "currentPrice":     round(fi.get("lastPrice", 0), 2),
-        "marketCap":        fi.get("marketCap", "N/A"),
-        "fiftyTwoWeekHigh": round(fi.get("yearHigh", 0), 2),
-        "fiftyTwoWeekLow":  round(fi.get("yearLow",  0), 2),
-    }
-
-    # ── history (one request) ────────────────────────────────────────────────
+def get_market_returns(years: int) -> pd.Series:
+    """Load SPY returns from local warehouse."""
     try:
-        history = stock.history(period=period)
-        if history.empty:
-            print(f"  ⚠  No price history returned for {ticker}.")
-            return info, None
-    except Exception as e:
-        print(f"  ✗  Failed to fetch history for {ticker}: {e}")
-        return info, None
+        df = load_local("SPY")
+        df = df.set_index("Date")
+        return df["Close"].pct_change().rename("Market_Return")
+    except FileNotFoundError:
+        print("  ⚠  SPY data not found in warehouse — market regime filter disabled.")
+        return None
 
-    return info, pd.DataFrame(history)
+def fetch_ticker_data(ticker: str, years: int) -> tuple[dict, pd.DataFrame | None]:
+    """
+    Fetch ticker data from local warehouse (CSV).
+    Returns: (info_dict, dataframe_last_N_years)
+    """
+    try:
+        df = load_local(ticker)
+        df = df.set_index("Date")
+        df.index = pd.to_datetime(df.index)
+
+        last = df["Close"].iloc[-1]
+        info = {
+            "currentPrice":     round(last, 2),
+            "marketCap":        "N/A",
+            "fiftyTwoWeekHigh": round(df["High"].tail(252).max(), 2),
+            "fiftyTwoWeekLow":  round(df["Low"].tail(252).min(), 2),
+        }
+
+        # Filter to requested years
+        cutoff = pd.Timestamp.now() - pd.DateOffset(years=years)
+        df = df[df.index >= cutoff]
+
+        if df.empty:
+            print(f"  ⚠  No data for {ticker} after filtering to {years} years.")
+            return info, None
+
+        return info, df
+
+    except FileNotFoundError:
+        print(f"  ✗  {ticker} not found in local warehouse.")
+        return {}, None
+    except Exception as e:
+        print(f"  ✗  Error loading {ticker}: {e}")
+        return {}, None
 
 # ─── INDICATORS ───────────────────────────────────────────────────────────────
 
@@ -156,13 +172,18 @@ def calculate_indicators(
             print(f"  ⚠  Not enough data for {ticker} after computing indicators.")
             return None
 
-        combined = pd.concat([df["Stock_Return"], market_returns], axis=1).dropna()
-        combined.columns = ["Stock_Return", "Market_Return"]
-        slope, _, r_value, _, _ = stats.linregress(
-            combined["Market_Return"], combined["Stock_Return"]
-        )
-        df.attrs["beta"]      = round(slope, 4)
-        df.attrs["r_squared"] = round(r_value ** 2, 4)
+        # Calculate beta if market data available
+        if market_returns is not None:
+            combined = pd.concat([df["Stock_Return"], market_returns], axis=1).dropna()
+            combined.columns = ["Stock_Return", "Market_Return"]
+            slope, _, r_value, _, _ = stats.linregress(
+                combined["Market_Return"], combined["Stock_Return"]
+            )
+            df.attrs["beta"]      = round(slope, 4)
+            df.attrs["r_squared"] = round(r_value ** 2, 4)
+        else:
+            df.attrs["beta"]      = 1.0
+            df.attrs["r_squared"] = 0.0
 
         return df
 
@@ -239,7 +260,6 @@ def analyze_seasonality(ticker: str, df: pd.DataFrame) -> str | None:
 
         path = f"{ticker}_seasonality.png"
         plt.savefig(path, dpi=150, bbox_inches="tight")
-        plt.show()
         plt.close()
         return path
 
@@ -369,8 +389,12 @@ def print_signal(ticker: str, res: dict) -> None:
 
 def main() -> None:
     print(f"\n{BAR}")
-    print("       Python Finance Analyst  ·  Portfolio Analyzer  v2.0")
+    print("       Python Finance Analyst  ·  Portfolio Analyzer  v2.1")
+    print("       (Using Local Warehouse Data)")
     print(BAR)
+
+    # Show warehouse status
+    warehouse_status()
 
     name_to_ticker = load_companies()
 
@@ -393,10 +417,9 @@ def main() -> None:
 
     print()
     num      = prompt_int("Number of stocks to analyze", 1, 20)
-    perd     = prompt_int("Years of historical data",    1, 10)
-    perd_str = f"{perd}y"
+    years    = prompt_int("Years of historical data",    1, 10)
 
-    # ── Risk-free rate (4) ────────────────────────────────────────────────────
+    # ── Risk-free rate ────────────────────────────────────────────────────────
     print(f"\n  Risk-Free Rate  (current 10Y US Treasury ≈ 4.2%)")
     print(f"  Press Enter to use 4.0% default, or type a value (e.g. 4.2).")
     raw_rf = input("  Annual RF rate [%]: ").strip()
@@ -420,10 +443,10 @@ def main() -> None:
                 tickers.append(ticker)
                 print(f"    ✔  {ticker} added.")
                 break
-            print(f"    ✗  '{ticker}' not found. Please try again.")
+            print(f"    ✗  '{ticker}' not found in warehouse. Run stock_warehouse.py to download it.")
 
-    print(f"\n  Loading market benchmark (S&P 500)…")
-    market_returns = get_market_returns(perd_str)
+    print(f"\n  Loading market benchmark (SPY)…")
+    market_returns = get_market_returns(years)
 
     # ── Per-ticker analysis ───────────────────────────────────────────────────
     all_data, stock_info, all_metrics, all_sentiment = {}, {}, {}, {}
@@ -433,8 +456,8 @@ def main() -> None:
         print(f"  Analyzing  {ticker}")
         print(BAR)
 
-        # Single fetch per ticker (1)
-        info, history          = fetch_ticker_data(ticker, perd_str)
+        # Single fetch per ticker (from local warehouse)
+        info, history          = fetch_ticker_data(ticker, years)
         stock_info[ticker]     = info
         print_stock_info(ticker, info)
 
@@ -442,13 +465,13 @@ def main() -> None:
             all_data[ticker] = None
             continue
 
-        # Indicators computed on already-fetched data (1)
+        # Indicators computed on already-fetched data
         df               = calculate_indicators(ticker, history, market_returns)
         all_data[ticker] = df
 
         if df is not None:
             print_indicators(ticker, df)
-            metrics             = calculate_financial_metrics(df["Stock_Return"], df.attrs["beta"], annual_rf)  # (4)
+            metrics             = calculate_financial_metrics(df["Stock_Return"], df.attrs["beta"], annual_rf)
             all_metrics[ticker] = metrics
             print_metrics(ticker, metrics)
 
