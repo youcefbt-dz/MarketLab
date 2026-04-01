@@ -3,7 +3,7 @@
 All notable changes to the **MarketLab** quantitative framework are documented in this technical evolution log.
 
 ## v2.5.0 - (Latest)
-###  Machine Learning & Advanced Risk
+###  Machine Learning & Risk
 - **ML Pipeline:** Implemented `ml_predictor.py` with SMOTE for class balancing and Data Purge for training hygiene.
 - **Performance:** Achieved **AUC = 0.996** and **100% Quality Recall** on 72 real records.
 - **ATR-Based Risk:** Replaced fixed exits with **ATR-based Dynamic Stop Loss** (1.5 × ATR14).
@@ -11,13 +11,13 @@ All notable changes to the **MarketLab** quantitative framework are documented i
 - **Precision:** Raised BUY/SELL thresholds to ±6 for higher signal quality.
 
 ## v2.4.0 
-###  Black Box & Reliability
+###  Black Box 
 - **Data Logger:** Launched `backtest_logger.py` with persistent JSON history.
 - **Reliability Engine:** New (0–100) scoring system per ticker and market regime.
 - **Market Guard:** Added **S&P 500 MA200 Regime Filter** and **Relative Strength Filter**.
 
 ## v2.3.0 
-###  Advanced Signal Logic
+###  Signal Logic
 - **Divergence:** Implemented RSI/Price divergence detection.
 - **Dynamic Exit:** First integration of dynamic SL/TP strategy.
 - **NLP Sentiment:** Improved news analysis with **Tail Risk detection** and time-weighting.
