@@ -1,117 +1,214 @@
 import pandas as pd
 import numpy as np
 
-BUY_THRESHOLD  =  7
-SELL_THRESHOLD = -7
+# ─── THRESHOLDS ───────────────────────────────────────────────────────────────
+BUY_THRESHOLD  =  6   # رُفع من 5 → 6 لتقليل الإشارات الضعيفة
+SELL_THRESHOLD = -6
+
+# ─── ATR CALCULATOR ───────────────────────────────────────────────────────────
+
+def calculate_atr(df: pd.DataFrame, period: int = 14) -> float:
+    """
+    يحسب ATR (Average True Range) لقياس تقلب السهم الفعلي.
+    يُستخدم لتحديد Stop Loss ديناميكياً بدل BB الثابت.
+    """
+    high  = df["High"].values  if "High"  in df.columns else df["Close"].values
+    low   = df["Low"].values   if "Low"   in df.columns else df["Close"].values
+    close = df["Close"].values
+
+    tr = np.maximum(
+        high[1:] - low[1:],
+        np.maximum(
+            np.abs(high[1:] - close[:-1]),
+            np.abs(low[1:]  - close[:-1]),
+        ),
+    )
+    if len(tr) < period:
+        return float(close[-1] * 0.02)  # fallback: 2% من السعر
+    return float(np.mean(tr[-period:]))
+
+
+# ─── ADX CALCULATOR ───────────────────────────────────────────────────────────
+
+def calculate_adx(df: pd.DataFrame, period: int = 14) -> float:
+    """
+    يحسب ADX (Average Directional Index) لقياس قوة الاتجاه.
+    ADX > 25 → اتجاه قوي يستحق الدخول
+    ADX < 20 → سوق متذبذب بلا اتجاه واضح
+    """
+    if "High" not in df.columns or "Low" not in df.columns:
+        return 25.0  # fallback محايد
+
+    high  = df["High"].values
+    low   = df["Low"].values
+    close = df["Close"].values
+    n     = len(close)
+
+    if n < period + 1:
+        return 25.0
+
+    plus_dm  = np.where((high[1:] - high[:-1]) > (low[:-1] - low[1:]),
+                         np.maximum(high[1:] - high[:-1], 0), 0)
+    minus_dm = np.where((low[:-1] - low[1:]) > (high[1:] - high[:-1]),
+                         np.maximum(low[:-1] - low[1:], 0), 0)
+    tr       = np.maximum(
+        high[1:] - low[1:],
+        np.maximum(np.abs(high[1:] - close[:-1]),
+                   np.abs(low[1:]  - close[:-1])),
+    )
+
+    atr14    = np.mean(tr[-period:])
+    if atr14 == 0:
+        return 25.0
+
+    plus_di  = 100 * np.mean(plus_dm[-period:])  / atr14
+    minus_di = 100 * np.mean(minus_dm[-period:]) / atr14
+    dx_denom = plus_di + minus_di
+    if dx_denom == 0:
+        return 25.0
+
+    dx  = 100 * abs(plus_di - minus_di) / dx_denom
+    return round(float(dx), 2)
 
 
 # ─── DIVERGENCE DETECTION ─────────────────────────────────────────────────────
 
 def detect_divergence(df: pd.DataFrame, lookback: int = 30) -> str | None:
-    """
-    Compare the last two swing highs/lows of price vs RSI.
-
-    Returns:
-        'bullish'  — price makes lower low, RSI makes higher low  (buy signal)
-        'bearish'  — price makes higher high, RSI makes lower high (sell signal)
-        None       — no divergence detected
-    """
     if len(df) < lookback:
         return None
 
-    window  = df.tail(lookback)
-    prices  = window["Close"].values
-    rsi     = window["RSI"].values
+    window = df.tail(lookback)
+    prices = window["Close"].values
+    rsi    = window["RSI"].values
 
-    # ── Find last two local lows (bullish divergence) ─────────────────────────
     low_idx = [
         i for i in range(1, len(prices) - 1)
         if prices[i] < prices[i - 1] and prices[i] < prices[i + 1]
     ]
     if len(low_idx) >= 2:
-        i1, i2 = low_idx[-2], low_idx[-1]          # older → newer
-        price_lower_low = prices[i2] < prices[i1]
-        rsi_higher_low  = rsi[i2]   > rsi[i1]
-        if price_lower_low and rsi_higher_low:
+        i1, i2 = low_idx[-2], low_idx[-1]
+        if prices[i2] < prices[i1] and rsi[i2] > rsi[i1]:
             return "bullish"
 
-    # ── Find last two local highs (bearish divergence) ────────────────────────
     high_idx = [
         i for i in range(1, len(prices) - 1)
         if prices[i] > prices[i - 1] and prices[i] > prices[i + 1]
     ]
     if len(high_idx) >= 2:
         i1, i2 = high_idx[-2], high_idx[-1]
-        price_higher_high = prices[i2] > prices[i1]
-        rsi_lower_high    = rsi[i2]    < rsi[i1]
-        if price_higher_high and rsi_lower_high:
+        if prices[i2] > prices[i1] and rsi[i2] < rsi[i1]:
             return "bearish"
 
     return None
 
 
-# ─── EXIT STRATEGY ────────────────────────────────────────────────────────────
+# ─── VOLATILITY FILTER ────────────────────────────────────────────────────────
 
-def calculate_exit_levels(df: pd.DataFrame, signal: str, risk_reward: float = 2.3) -> dict:
+def assess_volatility(df: pd.DataFrame, atr: float) -> dict:
     """
-    Compute Stop Loss and Take Profit levels.
+    يمنع الدخول عندما السوق متقلب بشكل خطير.
 
-    Stop Loss  : lower Bollinger Band  (support-based, dynamic)
-    Take Profit: SL distance × risk_reward ratio (default 1:2.3)
+    منطق:
+        ATR / Price > 5% → تقلب مفرط → عقوبة كبيرة
+        ATR / Price > 3% → تقلب عالٍ → عقوبة خفيفة
+        ATR / Price < 1% → تقلب منخفض → مكافأة (سوق هادئ)
+    """
+    price     = df["Close"].iloc[-1]
+    atr_pct   = (atr / price) * 100
 
-    Returns a dict with 'stop_loss', 'take_profit', and 'risk_reward'.
-    Returns empty dict if signal is HOLD / ERROR / WAIT.
+    if atr_pct > 5.0:
+        return {
+            "vol_score": -3,
+            "atr_pct":   round(atr_pct, 2),
+            "reason":    f"Volatility: ATR is {atr_pct:.1f}% of price — Extreme volatility, high risk (−3).",
+        }
+    elif atr_pct > 3.0:
+        return {
+            "vol_score": -1,
+            "atr_pct":   round(atr_pct, 2),
+            "reason":    f"Volatility: ATR is {atr_pct:.1f}% of price — Elevated volatility (−1).",
+        }
+    elif atr_pct < 1.0:
+        return {
+            "vol_score": 1,
+            "atr_pct":   round(atr_pct, 2),
+            "reason":    f"Volatility: ATR is {atr_pct:.1f}% of price — Low volatility, stable conditions (+1).",
+        }
+    else:
+        return {
+            "vol_score": 0,
+            "atr_pct":   round(atr_pct, 2),
+            "reason":    f"Volatility: ATR is {atr_pct:.1f}% of price — Normal range.",
+        }
+
+
+# ─── EXIT STRATEGY (ATR-Based SL + Dynamic RR) ───────────────────────────────
+
+def calculate_exit_levels(
+    df: pd.DataFrame,
+    signal: str,
+    atr: float,
+    score: int,
+    is_bullish_trend: bool,
+    risk_reward: float = 2.3,
+) -> dict:
+    """
+    Stop Loss ذكي بناءً على ATR بدل BB ثابت:
+        BUY  → SL = price - (1.5 × ATR)
+        SELL → SL = price + (1.5 × ATR)
+
+    Risk/Reward ديناميكي:
+        Bull + score ≥ 8  → RR = 3.0  (إشارة قوية جداً)
+        Bull + score ≥ 6  → RR = 2.5
+        Normal            → RR = 2.3
+        Weak signal       → RR = 2.0
     """
     if signal not in ("BUY", "STRONG BUY", "SELL", "STRONG SELL"):
         return {}
 
-    price     = df["Close"].iloc[-1]
-    lower_bb  = df["BB_lower"].iloc[-1]
-    upper_bb  = df["BB_upper"].iloc[-1]
+    price = df["Close"].iloc[-1]
+
+    # ── Dynamic Risk/Reward ───────────────────────────────────────────────────
+    if is_bullish_trend and score >= 8:
+        rr = 3.0
+    elif is_bullish_trend and score >= 6:
+        rr = 2.5
+    elif score <= -8:
+        rr = 3.0
+    elif score <= -6:
+        rr = 2.5
+    else:
+        rr = 2.3
+
+    atr_multiplier = 1.5   # معامل ATR للـ Stop Loss
 
     if "BUY" in signal:
-        stop_loss   = round(lower_bb, 2)
+        stop_loss   = round(price - atr_multiplier * atr, 2)
         risk        = price - stop_loss
-        take_profit = round(price + risk * risk_reward, 2)
-    else:  # SELL
-        stop_loss   = round(upper_bb, 2)
+        take_profit = round(price + risk * rr, 2)
+    else:
+        stop_loss   = round(price + atr_multiplier * atr, 2)
         risk        = stop_loss - price
-        take_profit = round(price - risk * risk_reward, 2)
+        take_profit = round(price - risk * rr, 2)
 
     return {
-        "stop_loss":   stop_loss,
-        "take_profit": take_profit,
-        "risk_reward": risk_reward,
+        "stop_loss":        stop_loss,
+        "take_profit":      take_profit,
+        "risk_reward":      rr,
+        "atr_used":         round(atr, 4),
+        "atr_multiplier":   atr_multiplier,
     }
 
 
 # ─── MARKET REGIME FILTER ─────────────────────────────────────────────────────
 
 def assess_market_regime(market_returns: pd.Series | None) -> dict:
-    """
-    Evaluate whether the broader market (S&P 500) is in Risk-On or Risk-Off mode.
-
-    Logic:
-        - Reconstruct a cumulative price index from daily returns.
-        - Compute its 200-day moving average.
-        - If price < MA200 → Risk-Off  → penalty applied to all scores.
-        - If price > MA200 → Risk-On   → no adjustment.
-
-    Returns:
-        {
-            'regime'       : 'Risk-On' | 'Risk-Off',
-            'score_penalty': int   (0 or negative),
-            'reason'       : str,
-        }
-    """
     if market_returns is None or len(market_returns) < 200:
         return {"regime": "Unknown", "score_penalty": 0, "reason": "Insufficient market data for regime filter."}
 
-    # Reconstruct index level from returns
     market_index = (1 + market_returns.dropna()).cumprod()
     ma200        = market_index.rolling(200).mean().iloc[-1]
     current      = market_index.iloc[-1]
-
     pct_vs_ma200 = (current - ma200) / ma200 * 100
 
     if current < ma200:
@@ -120,17 +217,56 @@ def assess_market_regime(market_returns: pd.Series | None) -> dict:
             "score_penalty": -3,
             "reason":        f"Market Regime: S&P 500 is {abs(pct_vs_ma200):.1f}% below its MA200 — Risk-Off mode (score −3).",
         }
+    return {
+        "regime":        "Risk-On",
+        "score_penalty": 0,
+        "reason":        f"Market Regime: S&P 500 is {pct_vs_ma200:.1f}% above its MA200 — Risk-On mode.",
+    }
+
+
+# ─── RELATIVE STRENGTH FILTER ────────────────────────────────────────────────
+
+def assess_relative_strength(df: pd.DataFrame, market_returns: pd.Series | None, lookback: int = 60) -> dict:
+    if market_returns is None or len(df) < lookback or len(market_returns) < lookback:
+        return {"rs_score": 0, "rs_pct": 0.0, "reason": "Relative Strength: insufficient data for comparison."}
+
+    stock_return = (df["Close"].iloc[-1] / df["Close"].iloc[-lookback] - 1) * 100
+    mkt_aligned  = market_returns.reindex(df.index).dropna()
+
+    if len(mkt_aligned) < lookback:
+        return {"rs_score": 0, "rs_pct": 0.0, "reason": "Relative Strength: market data alignment failed."}
+
+    mkt_return = ((1 + mkt_aligned.iloc[-lookback:]).cumprod().iloc[-1] - 1) * 100
+    rs_diff    = round(stock_return - mkt_return, 2)
+
+    if rs_diff >= 5:
+        return {
+            "rs_score": 1,
+            "rs_pct":   rs_diff,
+            "reason":   f"Relative Strength: Stock outperforms S&P 500 by {rs_diff:+.1f}% (last {lookback}d) — RS Bonus (+1).",
+        }
+    elif rs_diff <= -10:
+        return {
+            "rs_score": -2,
+            "rs_pct":   rs_diff,
+            "reason":   f"Relative Strength: Stock underperforms S&P 500 by {abs(rs_diff):.1f}% (last {lookback}d) — RS Penalty (−2).",
+        }
     else:
         return {
-            "regime":        "Risk-On",
-            "score_penalty": 0,
-            "reason":        f"Market Regime: S&P 500 is {pct_vs_ma200:.1f}% above its MA200 — Risk-On mode.",
+            "rs_score": 0,
+            "rs_pct":   rs_diff,
+            "reason":   f"Relative Strength: Stock vs S&P 500 = {rs_diff:+.1f}% (last {lookback}d) — Neutral.",
         }
 
 
 # ─── MAIN SIGNAL FUNCTION ─────────────────────────────────────────────────────
 
-def generate_signal(df: pd.DataFrame, info: dict, metrics: dict, market_returns: pd.Series | None = None) -> dict:
+def generate_signal(
+    df: pd.DataFrame,
+    info: dict,
+    metrics: dict,
+    market_returns: pd.Series | None = None,
+) -> dict:
     reasons = []
 
     try:
@@ -163,9 +299,13 @@ def generate_signal(df: pd.DataFrame, info: dict, metrics: dict, market_returns:
         lower_bb   = df["BB_lower"].iloc[-1]
         sharpe     = metrics.get("Sharpe Annualized", 0)
 
-        score        = 0
-        volume_high  = volume > avg_volume * 1.5
-        confidence   = "Normal"
+        # ── ATR + ADX ─────────────────────────────────────────────────────────
+        atr = calculate_atr(df)
+        adx = calculate_adx(df)
+
+        score          = 0
+        volume_high    = volume > avg_volume * 1.5
+        confidence     = "Normal"
         trigger_active = False
         trigger_bias   = 0
 
@@ -179,20 +319,30 @@ def generate_signal(df: pd.DataFrame, info: dict, metrics: dict, market_returns:
         score += 1 if is_golden_cross else -1
         reasons.append(f"Structure: {'Golden' if is_golden_cross else 'Death'} Cross active.")
 
-        # ── 2. Divergence (NEW) ───────────────────────────────────────────────
+        # ── 2. ADX Trend Strength Filter (NEW) ───────────────────────────────
+        if adx >= 25:
+            score += 1
+            reasons.append(f"Trend Strength: ADX = {adx:.1f} — Strong trend confirmed (+1).")
+        elif adx < 20:
+            score -= 1
+            reasons.append(f"Trend Strength: ADX = {adx:.1f} — Weak/no trend, choppy market (−1).")
+        else:
+            reasons.append(f"Trend Strength: ADX = {adx:.1f} — Moderate trend.")
+
+        # ── 3. Divergence ─────────────────────────────────────────────────────
         divergence = detect_divergence(df)
         if divergence == "bullish":
             score += 3
             trigger_active = True
             trigger_bias  += 1
-            reasons.append("Divergence: Bullish RSI divergence — price lower low, RSI higher low (strong reversal signal).")
+            reasons.append("Divergence: Bullish RSI divergence — price lower low, RSI higher low.")
         elif divergence == "bearish":
             score -= 3
             trigger_active = True
             trigger_bias  -= 1
-            reasons.append("Divergence: Bearish RSI divergence — price higher high, RSI lower high (strong reversal signal).")
+            reasons.append("Divergence: Bearish RSI divergence — price higher high, RSI lower high.")
 
-        # ── 3. Oversold / Overbought ──────────────────────────────────────────
+        # ── 4. Oversold / Overbought ──────────────────────────────────────────
         if rsi < 30 and stoch_k < 20:
             if is_bullish_trend:
                 score += 4
@@ -201,7 +351,6 @@ def generate_signal(df: pd.DataFrame, info: dict, metrics: dict, market_returns:
                 reasons.append(f"Trigger: Double Oversold (RSI {rsi:.1f} & Stoch {stoch_k:.1f}) in Bullish trend.")
             else:
                 reasons.append(f"Trigger: Oversold detected ({rsi:.1f}) — ignored in Bearish trend.")
-
         elif rsi > 70 and stoch_k > 80:
             if not is_bullish_trend:
                 score -= 4
@@ -212,16 +361,15 @@ def generate_signal(df: pd.DataFrame, info: dict, metrics: dict, market_returns:
                 score -= 1
                 reasons.append("Trigger: Overbought in Bullish trend (potential minor pullback).")
 
-        # ── 4. MA200 Support Test ─────────────────────────────────────────────
+        # ── 5. MA200 Support Test ─────────────────────────────────────────────
         margin = (price - ma200) / ma200
         if 0 < margin < 0.02 and 30 < rsi < 40:
             score += 1
             reasons.append(
-                f"Structure: Price testing MA200 support "
-                f"({margin * 100:.1f}% above) with RSI near oversold ({rsi:.1f})."
+                f"Structure: Price testing MA200 support ({margin*100:.1f}% above) with RSI near oversold ({rsi:.1f})."
             )
 
-        # ── 5. Stochastic Crossover ───────────────────────────────────────────
+        # ── 6. Stochastic Crossover ───────────────────────────────────────────
         if stoch_k > stoch_d and prev_k <= prev_d and stoch_k < 30:
             score += 1
             trigger_active = True
@@ -233,7 +381,7 @@ def generate_signal(df: pd.DataFrame, info: dict, metrics: dict, market_returns:
             trigger_bias  -= 1
             reasons.append("Momentum: Stochastic Bearish Crossover in Overbought zone.")
 
-        # ── 6. MACD Crossover ─────────────────────────────────────────────────
+        # ── 7. MACD Crossover ─────────────────────────────────────────────────
         if hist > 0 and prev_hist <= 0:
             score += 2
             trigger_active = True
@@ -245,7 +393,7 @@ def generate_signal(df: pd.DataFrame, info: dict, metrics: dict, market_returns:
             trigger_bias  -= 1
             reasons.append("Momentum: MACD Bearish Crossover.")
 
-        # ── 7. Bollinger Band Touch ───────────────────────────────────────────
+        # ── 8. Bollinger Band Touch ───────────────────────────────────────────
         if price <= lower_bb and is_bullish_trend:
             score += 2
             trigger_active = True
@@ -257,14 +405,14 @@ def generate_signal(df: pd.DataFrame, info: dict, metrics: dict, market_returns:
             trigger_bias  -= 1
             reasons.append("Volatility: Price touched Upper BB (overextended bearish).")
 
-        # ── 8. Volume Confirmation ────────────────────────────────────────────
+        # ── 9. Volume Confirmation ────────────────────────────────────────────
         if volume_high and trigger_active and trigger_bias != 0:
             vol_bonus  = 2 if trigger_bias > 0 else -2
             score     += vol_bonus
             direction  = "Bullish" if trigger_bias > 0 else "Bearish"
-            reasons.append(f"Volume: High activity ({volume / avg_volume:.1f}x) confirms {direction} triggers.")
+            reasons.append(f"Volume: High activity ({volume/avg_volume:.1f}x) confirms {direction} triggers.")
 
-        # ── 9. Sharpe Quality ─────────────────────────────────────────────────
+        # ── 10. Sharpe Quality ────────────────────────────────────────────────
         if sharpe > 1.5:
             confidence = "High"
             reasons.append(f"Quality: Solid Sharpe Ratio ({sharpe:.2f}).")
@@ -273,72 +421,60 @@ def generate_signal(df: pd.DataFrame, info: dict, metrics: dict, market_returns:
             score     -= 2
             reasons.append(f"Quality: Negative Sharpe ({sharpe:.2f}) — elevated risk.")
 
-        # ── 10. Market Regime Filter (NEW) ────────────────────────────────────
+        # ── 11. Volatility Filter (NEW) ───────────────────────────────────────
+        vol_info = assess_volatility(df, atr)
+        if vol_info["vol_score"] != 0:
+            score += vol_info["vol_score"]
+        reasons.append(vol_info["reason"])
+
+        # ── 12. Market Regime Filter ──────────────────────────────────────────
         regime_info = assess_market_regime(market_returns)
         if regime_info["score_penalty"] != 0:
             score += regime_info["score_penalty"]
         reasons.append(regime_info["reason"])
 
+        # ── 13. Relative Strength Filter ─────────────────────────────────────
+        rs_info = assess_relative_strength(df, market_returns)
+        if rs_info["rs_score"] != 0:
+            score += rs_info["rs_score"]
+        reasons.append(rs_info["reason"])
+
         # ── Signal determination ──────────────────────────────────────────────
         if score >= BUY_THRESHOLD:
-            signal = "STRONG BUY" if (score >= 10 and is_bullish_trend) else "BUY"
+            signal = "STRONG BUY" if (score >= 8 and is_bullish_trend) else "BUY"
         elif score <= SELL_THRESHOLD:
             signal = "STRONG SELL" if (score <= -10 and not is_bullish_trend) else "SELL"
         else:
             signal = "HOLD"
 
-        # ── 11. Exit Strategy (NEW) ───────────────────────────────────────────
-        exit_levels = calculate_exit_levels(df, signal)
+        # ── 14. Exit Strategy (ATR-Based) ─────────────────────────────────────
+        exit_levels = calculate_exit_levels(df, signal, atr, score, is_bullish_trend)
         if exit_levels:
             reasons.append(
                 f"Exit Strategy: Stop Loss ${exit_levels['stop_loss']}  |  "
                 f"Take Profit ${exit_levels['take_profit']}  "
-                f"(Risk/Reward 1:{exit_levels['risk_reward']})."
+                f"(Risk/Reward 1:{exit_levels['risk_reward']} | ATR={exit_levels['atr_used']})."
             )
 
         return {
-            "signal":          signal,
-            "score":           score,
+            "signal":           signal,
+            "score":            score,
             "confidence_level": confidence,
-            "reasons":         reasons,
-            "price_at_signal": round(price, 4),
-            "exit_levels":     exit_levels,
-            "market_regime":   regime_info["regime"],
+            "reasons":          reasons,
+            "price_at_signal":  round(price, 4),
+            "exit_levels":      exit_levels,
+            "market_regime":    regime_info["regime"],
+            "rs_pct":           rs_info["rs_pct"],
+            "adx":              adx,
+            "atr":              round(atr, 4),
+            "atr_pct":          vol_info["atr_pct"],
+            # ── Time Exit (محسّن) ─────────────────────────────────────────────
+            "time_exit": {
+                "enabled":        True,
+                "days":           5,      # مُمدَّد من 3 → 5 أيام
+                "min_profit_pct": 1.5,    # مخفَّض من 2.0% → 1.5%
+            },
         }
 
     except Exception as e:
-        return {"signal": "ERROR", "score": 0, "reasons": [f"Logic Failure: {e}"]}        
-    prev_hist = df['Histogram'].iloc[-2]
-    if histogram > 0 and prev_hist < 0: 
-        score += 3
-        reasons.append("MACD Histogram crossed above zero: Strong Bullish reversal.")
-    elif histogram > 0:
-        score += 1
-        reasons.append("MACD stays positive: Bullish momentum continues.")
-    else:
-        score -= 2
-        reasons.append("MACD is negative: Bearish momentum.")
-    if ma50 > ma200:
-        score += 2
-        reasons.append("Golden Cross (MA50 > MA200) active.")
-    else:
-        score -= 2
-        reasons.append("Death Cross (MA50 < MA200) active.")
-    if sharpe > 1.5:
-        score += 2
-        reasons.append(f"Excellent Sharpe Ratio ({sharpe:.2f}): High quality returns.")
-    elif sharpe < 0:
-        score -= 2
-        reasons.append(f"Negative Sharpe ({sharpe:.2f}): Poor risk-adjusted performance.")
-    if score >= BUY_THRESHOLD:
-        signal = "STRONG BUY" if score > 8 else "BUY"
-    elif score <= SELL_THRESHOLD:
-        signal = "STRONG SELL" if score < -6 else "SELL"
-    else:
-        signal = "HOLD"
-    return {
-        'signal': signal,
-        'score': score,
-        'max_score': 15, 
-        'reasons': reasons
-    }
+        return {"signal": "ERROR", "score": 0, "reasons": [f"Logic Failure: {e}"]}
