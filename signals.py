@@ -2,16 +2,13 @@ import pandas as pd
 import numpy as np
 
 # ─── THRESHOLDS ───────────────────────────────────────────────────────────────
-BUY_THRESHOLD  =  6   # رُفع من 5 → 6 لتقليل الإشارات الضعيفة
+BUY_THRESHOLD  =  6   
 SELL_THRESHOLD = -6
 
 # ─── ATR CALCULATOR ───────────────────────────────────────────────────────────
 
 def calculate_atr(df: pd.DataFrame, period: int = 14) -> float:
-    """
-    يحسب ATR (Average True Range) لقياس تقلب السهم الفعلي.
-    يُستخدم لتحديد Stop Loss ديناميكياً بدل BB الثابت.
-    """
+
     high  = df["High"].values  if "High"  in df.columns else df["Close"].values
     low   = df["Low"].values   if "Low"   in df.columns else df["Close"].values
     close = df["Close"].values
@@ -24,20 +21,16 @@ def calculate_atr(df: pd.DataFrame, period: int = 14) -> float:
         ),
     )
     if len(tr) < period:
-        return float(close[-1] * 0.02)  # fallback: 2% من السعر
+        return float(close[-1] * 0.02)  # fallback: 2% 
     return float(np.mean(tr[-period:]))
 
 
 # ─── ADX CALCULATOR ───────────────────────────────────────────────────────────
 
 def calculate_adx(df: pd.DataFrame, period: int = 14) -> float:
-    """
-    يحسب ADX (Average Directional Index) لقياس قوة الاتجاه.
-    ADX > 25 → اتجاه قوي يستحق الدخول
-    ADX < 20 → سوق متذبذب بلا اتجاه واضح
-    """
+
     if "High" not in df.columns or "Low" not in df.columns:
-        return 25.0  # fallback محايد
+        return 25.0  
 
     high  = df["High"].values
     low   = df["Low"].values
@@ -105,14 +98,6 @@ def detect_divergence(df: pd.DataFrame, lookback: int = 30) -> str | None:
 # ─── VOLATILITY FILTER ────────────────────────────────────────────────────────
 
 def assess_volatility(df: pd.DataFrame, atr: float) -> dict:
-    """
-    يمنع الدخول عندما السوق متقلب بشكل خطير.
-
-    منطق:
-        ATR / Price > 5% → تقلب مفرط → عقوبة كبيرة
-        ATR / Price > 3% → تقلب عالٍ → عقوبة خفيفة
-        ATR / Price < 1% → تقلب منخفض → مكافأة (سوق هادئ)
-    """
     price     = df["Close"].iloc[-1]
     atr_pct   = (atr / price) * 100
 
@@ -152,17 +137,6 @@ def calculate_exit_levels(
     is_bullish_trend: bool,
     risk_reward: float = 2.3,
 ) -> dict:
-    """
-    Stop Loss ذكي بناءً على ATR بدل BB ثابت:
-        BUY  → SL = price - (1.5 × ATR)
-        SELL → SL = price + (1.5 × ATR)
-
-    Risk/Reward ديناميكي:
-        Bull + score ≥ 8  → RR = 3.0  (إشارة قوية جداً)
-        Bull + score ≥ 6  → RR = 2.5
-        Normal            → RR = 2.3
-        Weak signal       → RR = 2.0
-    """
     if signal not in ("BUY", "STRONG BUY", "SELL", "STRONG SELL"):
         return {}
 
@@ -180,7 +154,7 @@ def calculate_exit_levels(
     else:
         rr = 2.3
 
-    atr_multiplier = 1.5   # معامل ATR للـ Stop Loss
+    atr_multiplier = 1.5   #
 
     if "BUY" in signal:
         stop_loss   = round(price - atr_multiplier * atr, 2)
@@ -471,8 +445,8 @@ def generate_signal(
             # ── Time Exit (محسّن) ─────────────────────────────────────────────
             "time_exit": {
                 "enabled":        True,
-                "days":           5,      # مُمدَّد من 3 → 5 أيام
-                "min_profit_pct": 1.5,    # مخفَّض من 2.0% → 1.5%
+                "days":           5,     
+                "min_profit_pct": 1.5, 
             },
         }
 
