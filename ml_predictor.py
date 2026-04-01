@@ -1,33 +1,4 @@
-"""
-ml_predictor.py — MarketLab ML Pipeline  v2.0
-===============================================
-تنبؤ بجودة استراتيجية Backtest قبل تشغيلها الكامل.
-
-التغييرات من v1:
-    1. Data Purge   — حذف Demo Runs الوهمية والمكررات تلقائياً
-    2. quality_trade target — مؤشر مركّب بدل passed المبني على قانون واحد:
-           Sharpe > 0.5  AND  Max Drawdown > -12%  AND  Win Rate > 50%
-    3. SMOTE — توليد عينات اصطناعية للفئة الأقلية لكسر الـ class imbalance
-
-الاستخدام:
-    from ml_predictor import BacktestPredictor
-
-    predictor = BacktestPredictor()
-    predictor.train()
-    predictor.evaluate()
-
-    result = predictor.predict({
-        "win_rate": 58.0,
-        "profit_factor": 1.9,
-        "sharpe": 0.65,
-        "max_drawdown": -9.5,
-        ...
-    })
-    # {"probability": 0.71, "prediction": "QUALITY", "confidence": "High", ...}
-"""
-
 from __future__ import annotations
-
 import json
 import os
 import warnings
@@ -62,9 +33,9 @@ RANDOM_STATE = 42
 REGIME_MAP   = {"Bull": 1, "Sideways": 0, "Bear": -1}
 
 # ── quality_trade thresholds ──────────────────────────────────────────────────
-QUALITY_SHARPE   =  0.5    # كفاءة مقابل المخاطرة
-QUALITY_DRAWDOWN = -12.0   # حماية رأس المال (القيمة أقل سالبية = أفضل)
-QUALITY_WINRATE  =  50.0   # استمرارية النفسية للمتداول
+QUALITY_SHARPE   =  0.5    
+QUALITY_DRAWDOWN = -12.0   
+QUALITY_WINRATE  =  50.0    
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -72,22 +43,13 @@ QUALITY_WINRATE  =  50.0   # استمرارية النفسية للمتداول
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def purge_history(data: list[dict]) -> tuple[list[dict], dict]:
-    """
-    يُنظّف سجل الـ backtest من:
-        - Demo Runs  : الـ runs ذات period_days=365 الناتجة عن تشغيل
-                       backtest_logger.py مباشرة في وضع Demo
-        - Duplicates : نفس (ticker, start, days) أكثر من مرة —
-                       يُبقى فقط أحدث run
-
-    يُرجع: (clean_records, purge_stats)
-    """
     seen     = {}   # key → index in result (للاحتفاظ بالأحدث)
     removed_demo  = 0
     removed_dupe  = 0
     result   = []
 
     for r in data:
-        # ── فلتر Demo Runs ────────────────────────────────────────────────────
+        # ──  Demo Runs ────────────────────────────────────────────────────
         if r["period"]["days"] == 365:
             removed_demo += 1
             continue
@@ -95,7 +57,6 @@ def purge_history(data: list[dict]) -> tuple[list[dict], dict]:
         key = (r["ticker"], r["period"]["start"], r["period"]["days"])
 
         if key in seen:
-            # استبدل القديم بالأحدث
             result[seen[key]] = r
             removed_dupe += 1
         else:
@@ -260,21 +221,7 @@ class MLDataset:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class BacktestPredictor:
-    """
-    يُدرّب 3 نماذج مع SMOTE على بيانات Backtest المُنقّاة،
-    يختار الأفضل بـ Cross-Validation، ويوفر predict().
-
-    SMOTE (Synthetic Minority Over-sampling Technique):
-        يُولّد عينات اصطناعية للفئة الأقل (quality_trade=1)
-        عن طريق interpolation بين الأمثلة الحقيقية — يكسر
-        الـ class imbalance بدل أن يكرر نفس العينات.
-    """
-
     def _make_models(self, n_minority: int) -> dict:
-        """
-        يبني الـ pipelines مع SMOTE.
-        k_neighbors يُحدَّد بناءً على حجم الفئة الأقلية.
-        """
         k = max(1, min(5, n_minority - 1))
 
         smote = SMOTE(k_neighbors=k, random_state=RANDOM_STATE)
@@ -337,8 +284,6 @@ class BacktestPredictor:
             print(f"  Training 3 models...\n")
 
         self._models = self._make_models(n_minority)
-
-        # n_splits لا يتجاوز عدد أصغر فئة
         n_splits = min(5, n_minority)
         cv = StratifiedKFold(
             n_splits=n_splits, shuffle=True, random_state=RANDOM_STATE
@@ -375,7 +320,7 @@ class BacktestPredictor:
         X, y = self.dataset.get_X_y()
         n    = len(X)
 
-        # ── CV predictions (أكثر موثوقية مع بيانات صغيرة) ───────────────────
+        # ── CV predictions ──────────────────
         n_minority = int(y.sum())
         n_splits   = min(5, n_minority)
         cv         = StratifiedKFold(
@@ -406,7 +351,7 @@ class BacktestPredictor:
             if (cm_cv[1][0] + cm_cv[1][1]) > 0 else 0
         )
         print(f"\n  Quality Recall  : {quality_recall:.1%}  "
-              f"← نسبة الـ Quality runs التي يكتشفها النموذج")
+              f"")
         print(f"\n{classification_report(y, y_pred_cv, target_names=['Non-Quality','Quality'])}")
         print(f"{'═'*55}\n")
 
@@ -460,23 +405,7 @@ class BacktestPredictor:
     # ── Predict ───────────────────────────────────────────────────────────────
 
     def predict(self, metrics: dict) -> dict:
-        """
-        يتنبأ بجودة run جديد بعد انتهاء الـ Backtest.
-
-        Args:
-            metrics: dict يحتوي على نفس مفاتيح FEATURE_COLS.
-                     القيم الغائبة تُعامل كـ 0.
-                     market_regime: 'Bull' / 'Sideways' / 'Bear'
-
-        Returns:
-            {
-                "probability": float,        # احتمالية quality_trade=1
-                "prediction":  str,          # 'QUALITY' أو 'STANDARD'
-                "confidence":  str,          # 'High' / 'Medium' / 'Low'
-                "model":       str,
-                "thresholds":  dict,         # ما الذي حقّقه / فشل فيه
-            }
-        """
+    
         if not self._trained:
             self.train(verbose=False)
 
@@ -501,7 +430,7 @@ class BacktestPredictor:
             "Low"
         )
 
-        # ── Threshold check (تشخيص ماذا أخفق) ───────────────────────────────
+        # ── Threshold check  ───────────────────────────────
         thresholds = {
             f"sharpe > {QUALITY_SHARPE}":          metrics.get("sharpe",       0) > QUALITY_SHARPE,
             f"drawdown > {QUALITY_DRAWDOWN}%":     metrics.get("max_drawdown", 0) > QUALITY_DRAWDOWN,
@@ -570,7 +499,7 @@ if __name__ == "__main__":
     predictor = BacktestPredictor()
     predictor.full_report()
 
-    # ── Test على runs حقيقية من الـ history ──────────────────────────────────
+    # ── Test  ──────────────────────────────────
     print("  Sample Predictions (runs حقيقية)")
     print("═"*55)
 
