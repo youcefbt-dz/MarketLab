@@ -2,11 +2,11 @@
   <img src="logo.svg" alt="MarketLab" width="440"/>
   <br/><br/>
 
-[![Version](https://img.shields.io/badge/version-2.5.0-378ADD?style=flat-square)](https://github.com/youcefbt-dz/python-finance-analyst)
-[![Python](https://img.shields.io/badge/python-3.10+-yellow?style=flat-square&logo=python&logoColor=white)](https://python.org)
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Open Source](https://img.shields.io/badge/open%20source-yes-brightgreen?style=flat-square)](https://github.com/youcefbt-dz)
-[![Stars](https://img.shields.io/github/stars/youcefbt-dz/python-finance-analyst?style=flat-square&color=yellow)](https://github.com/youcefbt-dz/python-finance-analyst/stargazers)
+[![Version](https://img.shields.io/badge/version-2.5.0-378ADD?style=for-the-badge)](https://github.com/youcefbt-dz/MarketLab)
+[![Python](https://img.shields.io/badge/python-3.10+-yellow?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![ML Accuracy](https://img.shields.io/badge/ML%20Accuracy-99%25-blueviolet?style=for-the-badge)](https://github.com/youcefbt-dz/MarketLab)
+[![Stars](https://img.shields.io/github/stars/youcefbt-dz/MarketLab?style=for-the-badge&color=yellow)](https://github.com/youcefbt-dz/MarketLab/stargazers)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue?style=for-the-badge)](LICENSE)
 
 **An open-source quantitative research and trading framework for stock analysis, strategy validation, and financial decision-making.**
 
