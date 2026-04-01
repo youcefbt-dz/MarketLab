@@ -389,32 +389,9 @@ MarketLab ships with `companies.json` containing **240+ pre-mapped companies** a
 
 ## Changelog
 
-**v2.5.0** — Latest
-- ATR-based Stop Loss (1.5 × ATR14) replacing fixed BB × 0.95
-- Dynamic Risk/Reward: 2.3 / 2.5 / 3.0 based on signal strength and trend
-- ADX Trend Strength Filter (±1) — confirms trend before entry
-- Volatility Filter via ATR percentage (±1 to ±3) — blocks extreme volatility entries
-- BUY/SELL threshold raised from ±5 → ±6 to reduce weak signals
-- STRONG BUY threshold raised from score ≥ 7 → score ≥ 8
-- Time Exit extended: 3 days → 5 days, min profit 2.0% → 1.5%
-- ML Predictor: AUC = 0.996, Quality Recall = 100% on 72 real records
-
-**v2.4.0**
-- Added Black Box Logger (`backtest_logger.py`) with persistent JSON history
-- Added Reliability Score engine (0–100) with per-ticker and per-regime breakdown
-- Added ML Pipeline (`ml_predictor.py`) with SMOTE and Data Purge
-- Added quality_trade composite target (Sharpe + Drawdown + Win Rate)
-- Added Relative Strength Filter vs S&P 500
-- Added Time Exit rule
-
-**v2.3.0**
-- Added RSI/Price divergence detection
-- Added Market Regime Filter (S&P 500 MA200)
-- Added dynamic exit strategy (Stop Loss / Take Profit)
-- Improved sentiment with Tail Risk detection & time-weighting
+[![History](https://img.shields.io/badge/Evolution-History-FF5733?style=for-the-badge&logo=gitbook&logoColor=white)](./SYSTEM_RELEASE_HISTORY.md)
 
 ---
-
 ## Contributing
 
 Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a pull request.
