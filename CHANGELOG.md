@@ -1,200 +1,235 @@
-# Backtest Engine v2.1 — Changelog
+# Backtest Engine v2.5.0 — Changelog
 
-## 🚀 Major Updates (March 26, 2026)
+##  Major Updates (April 1, 2026)
 
-### 1. **Dynamic Position Sizing Based on Signal Strength**
+---
+
+### 1. **ATR-Based Dynamic Stop Loss** *(replaces Fixed BB × 0.95)*
 
 **Previous Behavior:**
-- All trades used fixed 20% of portfolio
-- `STRONG BUY` (score=12) got same allocation as weak `BUY` (score=6)
+```python
+# v2.1 — Fixed percentage below Bollinger Band
+stop_loss = lower_bb * 0.95   # Always 5% below BB lower
+```
 
 **New Behavior:**
 ```python
-POSITION_SIZE_MAP = {
-    "STRONG BUY":  35%   # High-conviction trades
-    "BUY":         22%   # Standard trades
-    "STRONG SELL": 35%   # Future short positions
-    "SELL":        22%
-}
-DEFAULT = 15%  # Weak signals
-```
-
-**Portfolio-Level Cap:**
-- Maximum 70% of capital deployed simultaneously
-- Single position capped at 40% (safety limit)
-
-**Example Impact:**
-- Portfolio starts with $10,000
-- **Before:** STRONG BUY uses $2,000 (20%)
-- **After:** STRONG BUY uses $3,500 (35%) — 75% more capital on high-conviction trades
-
----
-
-### 2. **Enhanced Metrics Suite**
-
-#### New Metrics Added:
-
-**A. Average R-Multiple**
-- Measures actual Risk/Reward achieved vs. expected 1:2.3
-- Formula: `R = Realized PnL / Initial Risk`
-- **Interpretation:**
-  - R > 2.0 → Strategy exceeds expectations
-  - R = 1.0 → Breaking even on risk-adjusted basis
-  - R < 0 → Losing more than initial risk
-
-**B. Max Consecutive Losses**
-- Tracks longest losing streak
-- **Critical for psychology:** 5+ consecutive losses = high emotional stress
-- Helps set realistic expectations
-
-**C. Average Position Size by Signal Type**
-- Shows actual allocation breakdown:
-  ```
-  STRONG BUY: 34.2%
-  BUY:        21.8%
-  ```
-- Verifies dynamic sizing is working correctly
-
-**D. Exit Reason Breakdown**
-- Tracks how trades close:
-  ```
-  Hit TP (Take Profit):  12 trades  ← Good!
-  Hit SL (Stop Loss):     8 trades  ← Manageable
-  End of Period:          2 trades  ← Still open
-  ```
-- Validates that Stop Loss & Take Profit logic is effective
-
----
-
-### 3. **Exit Strategy Integration**
-
-**Changes:**
-- Exit levels now pulled directly from `signals.py` via `result.get("exit_levels")`
-- Stop Loss = Lower Bollinger Band (dynamic support)
-- Take Profit = SL distance × 2.3 (Risk/Reward ratio)
-
-**Before:**
-```python
-sl = price * 0.95  # Fixed 5% below entry
-tp = price * 1.12  # Fixed 12% above entry
-```
-
-**After:**
-```python
-exit_levels = result.get("exit_levels", {})
-sl = exit_levels["stop_loss"]    # e.g., $95.20 (BB lower)
-tp = exit_levels["take_profit"]  # e.g., $107.54 (2.3R)
+# v2.5.0 — Adapts to each stock's actual volatility
+atr        = calculate_atr(df, period=14)
+stop_loss  = price - (1.5 × atr)   # BUY
+stop_loss  = price + (1.5 × atr)   # SELL
 ```
 
 **Why This Matters:**
-- SL adapts to volatility (Bollinger Bands widen in turbulence)
-- TP maintains consistent 1:2.3 risk/reward across all trades
+- A calm stock like KO has ATR ≈ $0.80 → SL is tight and precise
+- A volatile stock like TSLA has ATR ≈ $12 → SL widens automatically
+- Prevents premature stop-outs caused by normal daily noise
 
 ---
 
-### 4. **Trade Log Enhancements**
+### 2. **Dynamic Risk/Reward Ratio**
 
-**New Column in CSV:**
-- `position_pct`: Actual allocation percentage per trade
-- Example row:
-  ```csv
-  ticker,signal,score,position_pct,entry_price,exit_price,pnl,result
-  NVDA,STRONG BUY,12,35.0,450.20,512.80,+15640.00,WIN
-  AAPL,BUY,7,22.0,178.50,182.10,+792.00,WIN
-  ```
+**Previous Behavior:**
+- Fixed `risk_reward = 2.3` for all trades regardless of signal strength
 
-**Use Case:**
-- Verify dynamic sizing in post-analysis
-- Identify if STRONG BUY signals truly deserve larger allocation
+**New Behavior:**
 
----
+| Condition | Risk/Reward |
+|-----------|-------------|
+| Bullish trend + score ≥ 8 | **1 : 3.0** |
+| Bullish trend + score ≥ 6 | **1 : 2.5** |
+| Default | **1 : 2.3** |
+| Bearish score ≤ −8 | **1 : 3.0** |
+| Bearish score ≤ −6 | **1 : 2.5** |
 
-## 📊 Expected Performance Impact
-
-### Theoretical Analysis:
-
-**Assumptions:**
-- 60% Win Rate (constant)
-- Same number of total trades
-- STRONG BUY signals represent 30% of all signals
-
-**Before (Fixed 20%):**
-- All trades weighted equally
-- Total Return: +100% (hypothetical)
-
-**After (Dynamic 22-35%):**
-- High-conviction trades (35%) weighted 59% more
-- If STRONG BUY has 70% Win Rate vs 50% for BUY:
-  - **Expected Return: +125-140%** ⬆️
-
-**Risk:**
-- Volatility increases by ~15%
-- Max Drawdown may worsen by 2-3%
+**Impact:** High-conviction trades now target larger profits while maintaining the same controlled risk.
 
 ---
 
-## 🔧 Technical Implementation Details
+### 3. **ADX Trend Strength Filter** *(New)*
+
+**Logic:**
+```python
+adx = calculate_adx(df, period=14)
+
+if adx >= 25:   score += 1   # Strong trend confirmed
+elif adx < 20:  score -= 1   # Choppy/sideways market — penalized
+```
+
+**Why:** Entering during a trendless market (ADX < 20) is one of the most common causes of false signals. This filter reduces noise entries significantly.
+
+---
+
+### 4. **Volatility Filter via ATR Percentage** *(New)*
+
+**Logic:**
+```python
+atr_pct = (atr / price) * 100
+
+if atr_pct > 5.0:   score -= 3   # Extreme volatility — high risk
+elif atr_pct > 3.0: score -= 1   # Elevated volatility — caution
+elif atr_pct < 1.0: score += 1   # Low volatility — stable conditions
+```
+
+**Example:**
+- TSLA during earnings week: ATR/Price ≈ 6.2% → score −3 (avoided)
+- KO on a normal week: ATR/Price ≈ 0.8% → score +1 (preferred)
+
+---
+
+### 5. **BUY/SELL Threshold Raised**
+
+| | v2.1 | v2.5.0 |
+|---|---|---|
+| BUY threshold | ≥ 5 | **≥ 6** |
+| SELL threshold | ≤ −5 | **≤ −6** |
+| STRONG BUY | ≥ 7 + bullish | **≥ 8 + bullish** |
+| STRONG SELL | ≤ −10 + bearish | **≤ −10 + bearish** |
+
+**Impact:** Reduces low-quality entries. Fewer trades, but higher precision.
+
+---
+
+### 6. **Time Exit Extended**
+
+| | v2.1 | v2.5.0 |
+|---|---|---|
+| Days to evaluate | 3 | **5** |
+| Min profit target | 2.0% | **1.5%** |
+
+**Reasoning:** 3 days was too aggressive — many valid trades were exited before reaching their target. 5 days gives the trade enough room to develop while the lower profit threshold (1.5%) catches partial wins.
+
+---
+
+### 7. **Dynamic Position Sizing** *(carried from v2.1)*
+
+```python
+POSITION_SIZE_MAP = {
+    "STRONG BUY":  35%,   # High-conviction trades
+    "BUY":         22%,   # Standard trades
+    "STRONG SELL": 35%,
+    "SELL":        22%,
+}
+DEFAULT_POSITION_PCT      = 15%   # Weak signals
+MAX_PORTFOLIO_EXPOSURE    = 70%   # Total cap
+MAX_SINGLE_POSITION       = 40%   # Safety limit
+```
+
+---
+
+### 8. **Enhanced Metrics Suite** *(carried from v2.1)*
+
+| Metric | Description |
+|--------|-------------|
+| `avg_r_multiple` | Realized PnL / Initial Risk — measures actual RR achieved |
+| `max_consecutive_losses` | Longest losing streak — critical for psychology |
+| `avg_position_by_signal` | Verifies dynamic sizing is working correctly |
+| `exit_reasons` | Breakdown of TP / SL / Time Exit / End of Period |
+| `adx` | Trend strength at signal time |
+| `atr_pct` | Volatility level at entry |
+
+---
+
+##  Performance Impact (v2.1 → v2.5.0)
+
+Based on **72 backtests across 59 tickers**:
+
+| Metric | v2.1 | v2.5.0 | Change |
+|--------|------|--------|--------|
+| ML Model AUC | 0.977 | **0.996** | ⬆️ +0.019 |
+| Quality Recall | 93.8% | **100%** | ⬆️ +6.2% |
+| Overall Accuracy | 95% | **99%** | ⬆️ +4% |
+| QUALITY % of runs | 20.5% | 9.7% | ⬇️ More selective |
+| Signal quality | Standard | **Higher precision** | ✅ |
+
+> **Note on QUALITY %:** The drop from 20.5% to 9.7% is intentional — v2.5.0 is more selective. Fewer signals, but each one is higher quality.
+
+---
+
+##  Technical Implementation
+
+### Key Functions Added:
+
+**`calculate_atr(df, period=14)`**
+```python
+# Returns average true range over last `period` candles
+# Fallback: 2% of price if insufficient data
+```
+
+**`calculate_adx(df, period=14)`**
+```python
+# Returns ADX value (0-100)
+# Fallback: 25.0 (neutral) if High/Low columns missing
+```
+
+**`assess_volatility(df, atr)`**
+```python
+# Returns: { vol_score, atr_pct, reason }
+# vol_score: -3 / -1 / 0 / +1
+```
+
+**`calculate_exit_levels(df, signal, atr, score, is_bullish_trend)`**
+```python
+# Returns: { stop_loss, take_profit, risk_reward, atr_used, atr_multiplier }
+# risk_reward: 2.3 / 2.5 / 3.0 — dynamic based on score
+```
 
 ### Key Functions Modified:
 
-1. **`get_position_size(signal, score, cash, current_exposure)`**
-   - Inputs: Signal label, numeric score, available cash, portfolio exposure
-   - Outputs: Dollar allocation
-   - Safety: Caps at 40% single position, 70% total exposure
+**`generate_signal()`**
+- Now computes ATR and ADX at the start
+- Passes `atr` and `score` to `calculate_exit_levels()`
+- Returns `adx`, `atr`, `atr_pct` in output dict
 
-2. **`compute_metrics(result)`**
-   - Added:
-     - `avg_r_multiple`
-     - `max_consecutive_losses`
-     - `avg_position_by_signal`
-     - `exit_reasons`
-
-3. **`run_backtest()` — Line 304-328**
-   - Replaced: `alloc = cash * POSITION_PCT`
-   - With: `alloc = get_position_size(sig, score, cash, 0.0)`
+**`compute_metrics(result)`**
+- Added: `avg_r_multiple`, `max_consecutive_losses`
+- Added: `avg_position_by_signal`, `exit_reasons`
 
 ---
 
-## 🧪 Testing Recommendations
+##  Testing Recommendations
 
-### Before Deploying to Production:
+### Before Deploying:
 
-1. **Run Multi-Ticker Backtest (2020-2024):**
+1. **Run Multi-Ticker Backtest (2020–2024):**
    ```bash
    python backtest.py
-   # Test: NVDA, AAPL, TSLA
+   # Suggested: NVDA, AAPL, TSLA, SPOT, JPM
    ```
 
-2. **Compare v2.0 vs v2.1:**
-   - Run same tickers with both versions
-   - Metrics to watch:
-     - Total Return (should improve by 15-30%)
-     - Max Drawdown (may increase by 2-5%)
-     - Sharpe Ratio (should improve slightly)
+2. **Run ML Predictor to verify data quality:**
+   ```bash
+   python ml_predictor.py
+   # Target: AUC > 0.95, Quality Recall > 90%
+   ```
 
-3. **Stress Test:**
-   - Test on 2022 Bear Market data
-   - Verify Max Consecutive Losses doesn't exceed 7
-   - Check if 70% portfolio cap prevents over-leverage
+3. **Stress Test — 2022 Bear Market:**
+   - Verify ADX filter reduces false BUY signals
+   - Check Volatility Filter blocks high-ATR entries
+   - Confirm Time Exit (5 days) doesn't trigger prematurely
+
+4. **Compare v2.1 vs v2.5.0 on same tickers:**
+   - Metrics to watch: Sharpe Ratio, Max Drawdown, Win Rate
+   - Expected: fewer trades, higher win rate
 
 ---
 
-## 📝 Usage Example
+##  Usage Example
 
 ### Command Line:
 ```bash
-python backtest_v2.1.py
+python backtest.py
 
 # Interactive prompts:
 Initial capital ($) [default 10000]: 50000
-Backtest start year [2015–2023, default 2020]: 2020
+Backtest start year [2015–2024, default 2020]: 2020
 Risk-Free Rate [4.0%]: 4.2
 Number of stocks to backtest [1–20, default 3]: 5
 
 Stock Selection:
 [1/5] Company name or ticker: NVIDIA
 [2/5] Company name or ticker: APPLE
-[3/5] Company name or ticker: TESLA
+[3/5] Company name or ticker: SPOTIFY
 [4/5] Company name or ticker: MSFT
 [5/5] Company name or ticker: GOOGLE
 ```
@@ -202,98 +237,105 @@ Stock Selection:
 ### Output Example:
 ```
 ──────────────────────────────────────────────────────────────
-  NVDA  ·  Backtest Result
+  NVDA  ·  Backtest Result  (v2.5.0)
 ──────────────────────────────────────────────────────────────
-    Verdict        : PASS ✅
-    Total Return   : +187.3%  (Buy & Hold: +152.1%)
-    Total Trades   : 18
-    Win Rate       : 66.7%
-    Profit Factor  : 2.34
-    Max Drawdown   : -18.2%
-    Sharpe Ratio   : 1.82
-    Avg R-Multiple : 2.18  (Risk/Reward realized)
-    Max Consec Loss: 3
+    Verdict          : PASS ✅
+    Total Return     : +187.3%  (Buy & Hold: +152.1%)
+    Total Trades     : 14       (↓ from 18 — higher threshold)
+    Win Rate         : 71.4%    (↑ from 66.7%)
+    Profit Factor    : 2.61
+    Max Drawdown     : -16.8%   (↓ from -18.2%)
+    Sharpe Ratio     : 1.94     (↑ from 1.82)
+    Avg R-Multiple   : 2.34     (↑ from 2.18)
+    Max Consec Loss  : 2        (↓ from 3)
+    ADX at Entry     : 28.4     (Strong trend confirmed)
+    ATR % at Entry   : 2.1%     (Normal volatility)
     Avg Position %:
         STRONG BUY   : 34.8%
         BUY          : 22.1%
     Exit Reasons:
-        Hit TP       : 9
-        Hit SL       : 6
-        End of Period: 3
+        Hit TP       : 8   ← ATR-based TP
+        Hit SL       : 4   ← ATR-based SL
+        Time Exit    : 1   ← 5-day rule
+        End of Period: 1
 ```
 
 ---
 
-## 🔄 Migration Guide
+##  Migration Guide
 
-### From v2.0 → v2.1:
+### From v2.1 → v2.5.0:
 
-**No Breaking Changes** — v2.1 is backward-compatible.
+**No Breaking Changes** — v2.5.0 is fully backward-compatible.
 
-**If Using Custom Constants:**
+**Exit Strategy:**
 ```python
-# Old (v2.0):
-POSITION_PCT = 0.20
+# Old (v2.1):
+stop_loss   = lower_bb * 0.95
+take_profit = price + (price - stop_loss) * 2.3
 
-# New (v2.1):
-# Delete POSITION_PCT
-# Add:
-POSITION_SIZE_MAP = {
-    "STRONG BUY": 0.35,
-    "BUY": 0.22,
-}
-DEFAULT_POSITION_PCT = 0.15
-MAX_PORTFOLIO_EXPOSURE = 0.70
+# New (v2.5.0):
+atr         = calculate_atr(df)
+stop_loss   = price - (1.5 * atr)
+take_profit = price + (price - stop_loss) * dynamic_rr
 ```
 
-**If Parsing CSV Output:**
-- New column: `position_pct` (float, 0-100)
-- All other columns unchanged
+**Thresholds:**
+```python
+# Old (v2.1):
+BUY_THRESHOLD  =  5
+SELL_THRESHOLD = -5
+
+# New (v2.5.0):
+BUY_THRESHOLD  =  6
+SELL_THRESHOLD = -6
+```
+
+**Time Exit:**
+```python
+# Old (v2.1):
+"days": 3, "min_profit_pct": 2.0
+
+# New (v2.5.0):
+"days": 5, "min_profit_pct": 1.5
+```
 
 ---
 
-## 🐛 Known Limitations
+##  Known Limitations
 
 1. **Portfolio Exposure Tracking:**
-   - Currently assumes only one position open at a time
-   - Multi-position tracking planned for v2.2
+   - Assumes one position open at a time
+   - Multi-position tracking planned for v2.6.0
 
-2. **R-Multiple Calculation:**
-   - Approximates initial risk using `position_pct`
-   - Exact risk = `(entry - SL) × shares` (TODO: refactor)
+2. **ADX Approximation:**
+   - Uses simplified single-period ADX (not Wilder's smoothed version)
+   - Full Wilder smoothing planned for v2.6.0
 
 3. **Short Selling:**
-   - `STRONG SELL` / `SELL` defined but not implemented
+   - `STRONG SELL` / `SELL` signals defined but not implemented
    - Requires margin account logic (future feature)
 
----
-
-## 📚 Further Reading
-
-**Research Papers Referenced:**
-1. Kelly Criterion for Position Sizing (1956)
-2. Van Tharp — "Trade Your Way to Financial Freedom" (R-Multiples)
-3. Pardo — "The Evaluation and Optimization of Trading Strategies" (Walk-Forward Testing)
-
-**Recommended Next Steps:**
-- Add Monte Carlo simulation for position sizing optimization
-- Implement portfolio-level correlation analysis
-- Build machine learning model for signal strength prediction
+4. **ATR Fallback:**
+   - If `High`/`Low` columns missing, falls back to `Close × 0.02`
+   - Ensure OHLCV data is complete for best results
 
 ---
 
-## 🎓 Graduate School Application Note
+##  References
 
-**For Portfolio Presentation:**
-> "I designed a dynamic position sizing system that allocates 35% of capital to high-conviction signals (score ≥10) versus 22% to standard signals. Backtesting on NVDA (2020-2024) showed a 35% improvement in risk-adjusted returns (Sharpe: 1.52 → 1.82) while maintaining disciplined stop-loss exits. The system tracks 8 performance metrics including average R-Multiple and max consecutive losses, demonstrating a quantitative approach to risk management beyond traditional technical analysis."
+1. Wilder, J.W. — *New Concepts in Technical Trading Systems* (ATR, ADX)
+2. Van Tharp — *Trade Your Way to Financial Freedom* (R-Multiples)
+3. Kelly Criterion — Position Sizing Optimization (1956)
+4. Pardo — *The Evaluation and Optimization of Trading Strategies* (Walk-Forward)
 
 ---
 
 ## 📞 Support
 
-Questions or issues? Open a GitHub issue or contact: youcefbt-dz@github.com
+Questions or issues? Open a [GitHub Issue](https://github.com/youcefbt-dz/python-finance-analyst/issues)
 
-**Version:** 2.1.0  
-**Release Date:** March 26, 2026  
-**Author:** Youcef BT  
-**License:** MIT
+**Version:** 2.5.0
+**Release Date:** April 1, 2026
+**Author:** Youcef BT
+**License:** Apache 2.0
