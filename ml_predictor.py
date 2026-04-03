@@ -10,11 +10,11 @@ from imblearn.over_sampling import SMOTE
 from imblearn.pipeline import Pipeline as ImbPipeline
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression
+from sklearn.base import clone
 from sklearn.model_selection import (
     StratifiedKFold,
     cross_val_score,
     cross_val_predict,
-    train_test_split,
 )
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import (
@@ -28,29 +28,48 @@ warnings.filterwarnings("ignore")
 # ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
 HISTORY_FILE = "backtest_history.json"
-MIN_SAMPLES  = 10
+# FIX 2+minor: raised from 10 → 20 so n_minority≥2 is meaningful for SMOTE/CV
+MIN_SAMPLES  = 20
 RANDOM_STATE = 42
 REGIME_MAP   = {"Bull": 1, "Sideways": 0, "Bear": -1}
 
 # ── quality_trade thresholds ──────────────────────────────────────────────────
-QUALITY_SHARPE   =  0.5    
-QUALITY_DRAWDOWN = -12.0   
-QUALITY_WINRATE  =  50.0    
+QUALITY_SHARPE   =  0.5
+QUALITY_DRAWDOWN = -12.0
+QUALITY_WINRATE  =  50.0
+
+# FIX 3: demo detection — flag used in purge_history, not a raw days check
+DEMO_PERIOD_DAYS = 365          # exact value Backtester uses for demo runs
+DEMO_TICKER      = "__DEMO__"   # optional: set a sentinel ticker in demo runs
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # STEP 1 — Data Purge
 # ═══════════════════════════════════════════════════════════════════════════════
 
+def _is_demo_run(r: dict) -> bool:
+    """
+    FIX 3: A run is a demo only when BOTH conditions hold:
+      - period.days == 365  (the demo default)
+      - ticker is the sentinel OR run_id starts with 'demo'
+    A real 1-year backtest on a normal ticker is NOT a demo.
+    """
+    days       = r.get("period", {}).get("days", 0)
+    ticker     = r.get("ticker", "")
+    run_id     = r.get("run_id", "")
+    is_365     = days == DEMO_PERIOD_DAYS
+    is_sentinel = ticker == DEMO_TICKER or str(run_id).lower().startswith("demo")
+    return is_365 and is_sentinel
+
+
 def purge_history(data: list[dict]) -> tuple[list[dict], dict]:
-    seen     = {}   # key → index in result (للاحتفاظ بالأحدث)
+    seen          = {}   # key → index in result (keep latest)
     removed_demo  = 0
     removed_dupe  = 0
-    result   = []
+    result        = []
 
     for r in data:
-        # ──  Demo Runs ────────────────────────────────────────────────────
-        if r["period"]["days"] == 365:
+        if _is_demo_run(r):
             removed_demo += 1
             continue
 
@@ -64,10 +83,10 @@ def purge_history(data: list[dict]) -> tuple[list[dict], dict]:
             result.append(r)
 
     stats = {
-        "original":     len(data),
+        "original"    : len(data),
         "removed_demo": removed_demo,
         "removed_dupe": removed_dupe,
-        "clean":        len(result),
+        "clean"       : len(result),
     }
     return result, stats
 
@@ -76,9 +95,24 @@ def purge_history(data: list[dict]) -> tuple[list[dict], dict]:
 # STEP 2 — MLDataset  (Feature Engineering + quality_trade label)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+# FIX 4: safe divisor helpers
+def _safe_div(numerator: float, denominator: float, fallback: float = 0.0) -> float:
+    """Return numerator/denominator, or fallback when denominator is ~0."""
+    return numerator / denominator if abs(denominator) > 1e-9 else fallback
+
+
+def _safe_drawdown_div(total_return: float, max_dd: float) -> float:
+    """
+    risk_adjusted_return = total_return / |max_dd|.
+    When max_dd == 0 (no losses), return total_return directly
+    so the feature stays meaningful instead of becoming ±∞.
+    """
+    return _safe_div(total_return, abs(max_dd), fallback=total_return)
+
+
 class MLDataset:
     """
-    يُحوّل backtest_history.json إلى DataFrame جاهز للـ ML.
+    Converts backtest_history.json to a DataFrame ready for ML.
 
     Features (16):
         Core     : win_rate, profit_factor, sharpe, max_drawdown,
@@ -89,9 +123,9 @@ class MLDataset:
         Derived  : win_loss_ratio, trade_efficiency, risk_adjusted_return
 
     Target:
-        quality_trade = 1  إذا:
+        quality_trade = 1  if:
             sharpe > 0.5  AND  max_drawdown > -12%  AND  win_rate > 50%
-        quality_trade = 0  خلاف ذلك
+        quality_trade = 0  otherwise
     """
 
     FEATURE_COLS = [
@@ -111,23 +145,21 @@ class MLDataset:
     def load(self) -> "MLDataset":
         if not os.path.exists(self.history_file):
             raise FileNotFoundError(
-                f"لم يُعثر على: {self.history_file}\n"
-                "شغّل Backtests أولاً لتتراكم البيانات."
+                f"Not found: {self.history_file}\n"
+                "Run Backtests first to accumulate data."
             )
 
         with open(self.history_file, "r", encoding="utf-8") as f:
             raw = json.load(f)
 
-        # ── Data Purge ────────────────────────────────────────────────────────
         data, self.purge_stats = purge_history(raw)
 
         if len(data) < MIN_SAMPLES:
             raise ValueError(
-                f"بعد التنظيف تبقّى {len(data)} records فقط — "
-                f"يلزم على الأقل {MIN_SAMPLES}."
+                f"Only {len(data)} records after purge — "
+                f"need at least {MIN_SAMPLES}."
             )
 
-        # ── Feature Engineering ───────────────────────────────────────────────
         rows = []
         for r in data:
             m  = r.get("metrics", {})
@@ -138,7 +170,7 @@ class MLDataset:
             wins         = ts.get("wins",   0)
             losses       = ts.get("losses", 0)
             total_return = m.get("total_return", 0)
-            max_dd       = m.get("max_drawdown", -0.001) or -0.001
+            max_dd       = m.get("max_drawdown", 0)   # FIX 4: keep 0, handle in helper
 
             sl_hits = er.get("Hit SL", 0) + er.get("Hit SL (Gap Down)", 0)
             tp_hits = er.get("Hit TP", 0) + er.get("Hit TP (Gap Up)",   0)
@@ -147,7 +179,6 @@ class MLDataset:
             drawdown = m.get("max_drawdown", 0)
             win_rate = m.get("win_rate",     0)
 
-            # ── quality_trade label ───────────────────────────────────────────
             quality = int(
                 sharpe   >  QUALITY_SHARPE   and
                 drawdown >  QUALITY_DRAWDOWN  and
@@ -155,29 +186,27 @@ class MLDataset:
             )
 
             rows.append({
-                # Features
-                "win_rate":               win_rate,
-                "profit_factor":          m.get("profit_factor",          0),
-                "sharpe":                 sharpe,
-                "max_drawdown":           drawdown,
-                "avg_r_multiple":         m.get("avg_r_multiple",         0),
+                "win_rate"              : win_rate,
+                "profit_factor"         : m.get("profit_factor",          0),
+                "sharpe"                : sharpe,
+                "max_drawdown"          : drawdown,
+                "avg_r_multiple"        : m.get("avg_r_multiple",         0),
                 "max_consecutive_losses": m.get("max_consecutive_losses", 0),
-                "total_trades":           total_trades,
-                "avg_score":              ts.get("avg_score", 0),
-                "total_return":           total_return,
-                "period_days":            r.get("period", {}).get("days", 0),
-                "market_regime_enc":      REGIME_MAP.get(
+                "total_trades"          : total_trades,
+                "avg_score"             : ts.get("avg_score", 0),
+                "total_return"          : total_return,
+                "period_days"           : r.get("period", {}).get("days", 0),
+                "market_regime_enc"     : REGIME_MAP.get(
                                             r.get("market_regime", "Sideways"), 0),
-                "sl_rate":                round(sl_hits / total_trades, 4),
-                "tp_rate":                round(tp_hits / total_trades, 4),
-                "win_loss_ratio":         round(wins   / (losses + 1),   4),
-                "trade_efficiency":       round(total_return / total_trades, 4),
-                "risk_adjusted_return":   round(total_return / abs(max_dd),  4),
-                # Metadata
-                "ticker":                 r.get("ticker", ""),
-                "run_id":                 r.get("run_id", ""),
-                # Target
-                "quality_trade":          quality,
+                "sl_rate"               : round(_safe_div(sl_hits, total_trades), 4),
+                "tp_rate"               : round(_safe_div(tp_hits, total_trades), 4),
+                "win_loss_ratio"        : round(_safe_div(wins, losses + 1),      4),
+                "trade_efficiency"      : round(_safe_div(total_return, total_trades), 4),
+                # FIX 4: no more ±∞ when max_dd == 0
+                "risk_adjusted_return"  : round(_safe_drawdown_div(total_return, max_dd), 4),
+                "ticker"                : r.get("ticker", ""),
+                "run_id"                : r.get("run_id", ""),
+                "quality_trade"         : quality,
             })
 
         self.df = pd.DataFrame(rows)
@@ -192,9 +221,9 @@ class MLDataset:
         if self.df is None:
             self.load()
 
-        ps   = self.purge_stats
-        n    = len(self.df)
-        nq   = self.df["quality_trade"].sum()
+        ps = self.purge_stats
+        n  = len(self.df)
+        nq = self.df["quality_trade"].sum()
 
         print(f"\n{'═'*55}")
         print(f"  ML Dataset — Data Purge Report")
@@ -221,9 +250,9 @@ class MLDataset:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class BacktestPredictor:
-    def _make_models(self, n_minority: int) -> dict:
-        k = max(1, min(5, n_minority - 1))
 
+    def _make_models(self, n_minority: int) -> dict:
+        k     = max(1, min(5, n_minority - 1))
         smote = SMOTE(k_neighbors=k, random_state=RANDOM_STATE)
 
         return {
@@ -268,6 +297,8 @@ class BacktestPredictor:
         self.feature_cols  = MLDataset.FEATURE_COLS
         self._trained      = False
         self._models       = {}
+        # FIX 1: store unfitted clone for evaluate() to avoid data leakage
+        self._best_pipeline_unfitted = None
 
     # ── Train ─────────────────────────────────────────────────────────────────
 
@@ -284,23 +315,24 @@ class BacktestPredictor:
             print(f"  Training 3 models...\n")
 
         self._models = self._make_models(n_minority)
-        n_splits = min(5, n_minority)
-        cv = StratifiedKFold(
-            n_splits=n_splits, shuffle=True, random_state=RANDOM_STATE
-        )
+        n_splits     = min(5, n_minority)
+        cv           = StratifiedKFold(
+                           n_splits=n_splits, shuffle=True, random_state=RANDOM_STATE)
 
         results = {}
         for name, pipeline in self._models.items():
-            scores = cross_val_score(
-                pipeline, X, y, cv=cv, scoring="roc_auc"
-            )
+            scores = cross_val_score(pipeline, X, y, cv=cv, scoring="roc_auc")
             results[name] = {"mean": scores.mean(), "std": scores.std()}
             if verbose:
                 print(f"  {name:<25} AUC = {scores.mean():.3f} ± {scores.std():.3f}")
 
         self.best_name     = max(results, key=lambda k: results[k]["mean"])
         self.best_cv_score = results[self.best_name]["mean"]
-        self.best_model    = self._models[self.best_name]
+
+        # FIX 1: keep an unfitted clone BEFORE fitting on full data
+        self._best_pipeline_unfitted = clone(self._models[self.best_name])
+
+        self.best_model = self._models[self.best_name]
         self.best_model.fit(X, y)
         self._trained = True
 
@@ -318,19 +350,17 @@ class BacktestPredictor:
             self.train(verbose=False)
 
         X, y = self.dataset.get_X_y()
-        n    = len(X)
 
-        # ── CV predictions ──────────────────
         n_minority = int(y.sum())
         n_splits   = min(5, n_minority)
         cv         = StratifiedKFold(
-                        n_splits=n_splits, shuffle=True,
-                        random_state=RANDOM_STATE)
+                         n_splits=n_splits, shuffle=True, random_state=RANDOM_STATE)
 
-        y_pred_cv  = cross_val_predict(self.best_model, X, y, cv=cv)
-        y_prob_cv  = cross_val_predict(
-                        self.best_model, X, y, cv=cv, method="predict_proba"
-                     )[:, 1]
+        # FIX 1: use the unfitted clone — no data leakage
+        unfitted = self._best_pipeline_unfitted
+        y_pred_cv = cross_val_predict(unfitted, X, y, cv=cv)
+        y_prob_cv = cross_val_predict(
+                        unfitted, X, y, cv=cv, method="predict_proba")[:, 1]
 
         auc_cv = roc_auc_score(y, y_prob_cv) if len(set(y)) > 1 else float("nan")
         cm_cv  = confusion_matrix(y, y_pred_cv)
@@ -350,15 +380,14 @@ class BacktestPredictor:
             cm_cv[1][1] / (cm_cv[1][0] + cm_cv[1][1])
             if (cm_cv[1][0] + cm_cv[1][1]) > 0 else 0
         )
-        print(f"\n  Quality Recall  : {quality_recall:.1%}  "
-              f"")
+        print(f"\n  Quality Recall  : {quality_recall:.1%}")
         print(f"\n{classification_report(y, y_pred_cv, target_names=['Non-Quality','Quality'])}")
         print(f"{'═'*55}\n")
 
         return {
-            "cv_auc":         round(auc_cv, 3),
+            "cv_auc"        : round(auc_cv, 3),
             "quality_recall": round(quality_recall, 3),
-            "model":          self.best_name,
+            "model"         : self.best_name,
         }
 
     # ── Feature Importance ────────────────────────────────────────────────────
@@ -374,12 +403,12 @@ class BacktestPredictor:
         elif hasattr(clf, "coef_"):
             importances = np.abs(clf.coef_[0])
         else:
-            print("  النموذج لا يدعم feature importances.")
+            print("  Model does not support feature importances.")
             return pd.DataFrame()
 
         df_imp = (
             pd.DataFrame({
-                "feature":    self.feature_cols,
+                "feature"   : self.feature_cols,
                 "importance": importances,
             })
             .sort_values("importance", ascending=False)
@@ -405,17 +434,14 @@ class BacktestPredictor:
     # ── Predict ───────────────────────────────────────────────────────────────
 
     def predict(self, metrics: dict) -> dict:
-    
         if not self._trained:
             self.train(verbose=False)
 
         row = {}
         for col in self.feature_cols:
             if col == "market_regime_enc":
-                raw = metrics.get(
-                    "market_regime",
-                    metrics.get("market_regime_enc", "Sideways")
-                )
+                raw    = metrics.get("market_regime",
+                         metrics.get("market_regime_enc", "Sideways"))
                 row[col] = REGIME_MAP.get(raw, raw) if isinstance(raw, str) else raw
             else:
                 row[col] = metrics.get(col, 0)
@@ -430,19 +456,18 @@ class BacktestPredictor:
             "Low"
         )
 
-        # ── Threshold check  ───────────────────────────────
         thresholds = {
-            f"sharpe > {QUALITY_SHARPE}":          metrics.get("sharpe",       0) > QUALITY_SHARPE,
-            f"drawdown > {QUALITY_DRAWDOWN}%":     metrics.get("max_drawdown", 0) > QUALITY_DRAWDOWN,
-            f"win_rate > {QUALITY_WINRATE}%":      metrics.get("win_rate",     0) > QUALITY_WINRATE,
+            f"sharpe > {QUALITY_SHARPE}"      : metrics.get("sharpe",       0) > QUALITY_SHARPE,
+            f"drawdown > {QUALITY_DRAWDOWN}%" : metrics.get("max_drawdown", 0) > QUALITY_DRAWDOWN,
+            f"win_rate > {QUALITY_WINRATE}%"  : metrics.get("win_rate",     0) > QUALITY_WINRATE,
         }
 
         return {
             "probability": round(prob, 4),
-            "prediction":  prediction,
-            "confidence":  confidence,
-            "model":       self.best_name,
-            "thresholds":  thresholds,
+            "prediction" : prediction,
+            "confidence" : confidence,
+            "model"      : self.best_name,
+            "thresholds" : thresholds,
         }
 
     # ── Full Report ───────────────────────────────────────────────────────────
@@ -458,10 +483,14 @@ class BacktestPredictor:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def train_predictor(history_file: str = HISTORY_FILE) -> BacktestPredictor:
-    """يُدرّب النموذج ويُرجع predictor جاهزاً."""
+    """Train and return a ready predictor."""
     predictor = BacktestPredictor(history_file)
     predictor.train()
     return predictor
+
+
+# FIX 2: module-level cache — train once, reuse across calls
+_predictor_cache: dict[str, BacktestPredictor] = {}
 
 
 def predict_quality(
@@ -469,9 +498,10 @@ def predict_quality(
     history_file: str = HISTORY_FILE,
 ) -> dict:
     """
-    تنبؤ مباشر بجودة run بعد انتهاء الـ Backtest.
+    Predict run quality after a backtest completes.
+    The predictor is trained once per history_file and cached in memory.
 
-    مثال:
+    Example:
         from ml_predictor import predict_quality
 
         result = predict_quality({
@@ -479,12 +509,23 @@ def predict_quality(
             "max_drawdown": -10.09, "total_return": 28.7,
             ...
         })
-        print(result["prediction"])   # 'QUALITY' أو 'STANDARD'
+        print(result["prediction"])   # 'QUALITY' or 'STANDARD'
         print(result["probability"])  # 0.0 — 1.0
     """
-    predictor = BacktestPredictor(history_file)
-    predictor.train(verbose=False)
-    return predictor.predict(metrics)
+    global _predictor_cache
+    if history_file not in _predictor_cache:
+        predictor = BacktestPredictor(history_file)
+        predictor.train(verbose=False)
+        _predictor_cache[history_file] = predictor
+    return _predictor_cache[history_file].predict(metrics)
+
+
+def invalidate_cache(history_file: str = HISTORY_FILE) -> None:
+    """
+    Call this after new backtest runs are appended to history_file
+    so the next predict_quality() call retrains on fresh data.
+    """
+    _predictor_cache.pop(history_file, None)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -493,20 +534,18 @@ def predict_quality(
 
 if __name__ == "__main__":
     print("\n" + "═"*55)
-    print("  MarketLab — ML Predictor  v2.0")
+    print("  MarketLab — ML Predictor  v2.1")
     print("═"*55)
 
     predictor = BacktestPredictor()
     predictor.full_report()
 
-    # ── Test  ──────────────────────────────────
-    print("  Sample Predictions (runs حقيقية)")
+    print("  Sample Predictions")
     print("═"*55)
 
     test_cases = [
         {
-            # AAPL — quality_trade=1 (WR=66.7, Sharpe=0.69, DD=-7.85)
-            "label":    "AAPL  — متوقع: QUALITY",
+            "label":    "AAPL  — expected: QUALITY",
             "expected": "QUALITY",
             "metrics": {
                 "win_rate": 66.7, "profit_factor": 4.22, "sharpe": 0.69,
@@ -520,8 +559,7 @@ if __name__ == "__main__":
             },
         },
         {
-            # TSLA — quality_trade=0 (WR=31.6, Sharpe=0.38, DD=-14.88)
-            "label":    "TSLA  — متوقع: STANDARD",
+            "label":    "TSLA  — expected: STANDARD",
             "expected": "STANDARD",
             "metrics": {
                 "win_rate": 31.6, "profit_factor": 1.52, "sharpe": 0.38,
@@ -535,8 +573,7 @@ if __name__ == "__main__":
             },
         },
         {
-            # MSFT — quality_trade=0 (WR=46.2, Sharpe=0.34, DD=-11.22)
-            "label":    "MSFT  — متوقع: STANDARD",
+            "label":    "MSFT  — expected: STANDARD",
             "expected": "STANDARD",
             "metrics": {
                 "win_rate": 46.2, "profit_factor": 1.61, "sharpe": 0.34,
@@ -550,8 +587,7 @@ if __name__ == "__main__":
             },
         },
         {
-            # SPOT — quality_trade=1 (WR=63.6, Sharpe=0.85, DD=-8.51)
-            "label":    "SPOT  — متوقع: QUALITY",
+            "label":    "SPOT  — expected: QUALITY",
             "expected": "QUALITY",
             "metrics": {
                 "win_rate": 63.6, "profit_factor": 4.83, "sharpe": 0.85,
@@ -565,8 +601,7 @@ if __name__ == "__main__":
             },
         },
         {
-            # HON — quality_trade=0 (WR=20, Sharpe=-0.15, DD=-13.58)
-            "label":    "HON   — متوقع: STANDARD",
+            "label":    "HON   — expected: STANDARD",
             "expected": "STANDARD",
             "metrics": {
                 "win_rate": 20.0, "profit_factor": 0.67, "sharpe": -0.15,
@@ -595,15 +630,14 @@ if __name__ == "__main__":
         print(f"     Confidence   : {result['confidence']}")
 
         checks = result["thresholds"]
-        status = "  ".join(
-            f"{'✓' if v else '✗'} {k}" for k, v in checks.items()
-        )
+        status = "  ".join(f"{'✓' if v else '✗'} {k}" for k, v in checks.items())
         print(f"     Checks       : {status}")
 
     print(f"\n{'═'*55}")
     print(f"  Sample accuracy: {correct}/{len(test_cases)}")
     print(f"{'═'*55}")
-    print("  backtest.py:")
-    print("    from ml_predictor import predict_quality")
+    print("  Usage in backtest.py:")
+    print("    from ml_predictor import predict_quality, invalidate_cache")
     print("    result = predict_quality(metrics_dict)")
+    print("    invalidate_cache()  # call after appending new runs")
     print(f"{'═'*55}\n")
