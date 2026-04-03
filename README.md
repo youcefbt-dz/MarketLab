@@ -34,15 +34,18 @@ Raw Market Data  →  Technical Indicators  →  Trading Signals  →  Backtesti
 
 <div align="center">
 
-###  Executive Summary Report
-![Report](docs/screenshots/screenshot_report.png)
+### Executive Summary Report
+<img src="docs/screenshots/screenshot_report.png" width="650"/>
 
-###  News Sentiment Analysis
-![Sentiment](docs/screenshots/screenshot_sentiment.png)
+<br>
 
-###  Technical Charts
-![Charts](docs/screenshots/screenshot_charts.png)
+### News Sentiment Analysis
+<img src="docs/screenshots/screenshot_sentiment.png" width="650"/>
 
+<br>
+
+### Technical Charts
+<img src="docs/screenshots/screenshot_charts.png" width="650"/>
 
 </div>
 
