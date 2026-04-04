@@ -33,23 +33,27 @@ The project is designed to be readable, extensible, and portfolio-ready — with
 
 ---
 
-## Screenshots
+### Screenshots
 
 <div align="center">
-
-### Executive Summary Report
-<img src="docs/screenshots/screenshot_report.png" width="680"/>
-
-<br/>
-
-### News Sentiment Analysis
-<img src="docs/screenshots/screenshot_sentiment.png" width="680"/>
-
-<br/>
-
-### Technical Charts
-<img src="docs/screenshots/screenshot_charts.png" width="680"/>
-
+  <table>
+    <tr>
+      <td align="center">
+        <strong>Executive Summary Report</strong><br/>
+        <img src="docs/screenshots/screenshot_report.png" width="300" style="border-radius: 8px; margin: 8px;">
+      </td>
+      <td align="center">
+        <strong>News Sentiment Analysis</strong><br/>
+        <img src="docs/screenshots/screenshot_sentiment.png" width="300" style="border-radius: 8px; margin: 8px;">
+      </td>
+    </tr>
+    <tr>
+      <td align="center" colspan="2">
+        <strong>Technical Charts</strong><br/>
+        <img src="docs/screenshots/screenshot_charts.png" width="620" style="border-radius: 8px; margin: 8px;">
+      </td>
+    </tr>
+  </table>
 </div>
 
 ---
