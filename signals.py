@@ -4,6 +4,7 @@ import numpy as np
 # ─── THRESHOLDS ───────────────────────────────────────────────────────────────
 BUY_THRESHOLD  =  6   
 SELL_THRESHOLD = -6
+MIN_ADX_ENTRY  = 18
 
 # ─── ATR CALCULATOR ───────────────────────────────────────────────────────────
 
@@ -21,7 +22,7 @@ def calculate_atr(df: pd.DataFrame, period: int = 14) -> float:
         ),
     )
     if len(tr) < period:
-        return float(close[-1] * 0.02)  # fallback: 2% 
+        return float(close[-1] * 0.02)  
     return float(np.mean(tr[-period:]))
 
 
@@ -30,7 +31,7 @@ def calculate_atr(df: pd.DataFrame, period: int = 14) -> float:
 def calculate_adx(df: pd.DataFrame, period: int = 14) -> float:
 
     if "High" not in df.columns or "Low" not in df.columns:
-        return 25.0  
+        return 25.0  # fallback 
 
     high  = df["High"].values
     low   = df["Low"].values
@@ -98,6 +99,7 @@ def detect_divergence(df: pd.DataFrame, lookback: int = 30) -> str | None:
 # ─── VOLATILITY FILTER ────────────────────────────────────────────────────────
 
 def assess_volatility(df: pd.DataFrame, atr: float) -> dict:
+
     price     = df["Close"].iloc[-1]
     atr_pct   = (atr / price) * 100
 
@@ -137,6 +139,7 @@ def calculate_exit_levels(
     is_bullish_trend: bool,
     risk_reward: float = 2.3,
 ) -> dict:
+
     if signal not in ("BUY", "STRONG BUY", "SELL", "STRONG SELL"):
         return {}
 
@@ -154,7 +157,7 @@ def calculate_exit_levels(
     else:
         rr = 2.3
 
-    atr_multiplier = 1.5   #
+    atr_multiplier = 2.5  
 
     if "BUY" in signal:
         stop_loss   = round(price - atr_multiplier * atr, 2)
@@ -278,7 +281,7 @@ def generate_signal(
         adx = calculate_adx(df)
 
         score          = 0
-        volume_high    = volume > avg_volume * 1.5
+        volume_high    = volume > avg_volume * 1.2
         confidence     = "Normal"
         trigger_active = False
         trigger_bias   = 0
@@ -293,13 +296,12 @@ def generate_signal(
         score += 1 if is_golden_cross else -1
         reasons.append(f"Structure: {'Golden' if is_golden_cross else 'Death'} Cross active.")
 
-        # ── 2. ADX Trend Strength Filter (NEW) ───────────────────────────────
-        if adx >= 25:
+        if adx < MIN_ADX_ENTRY:
+            score -= 3
+            reasons.append(f"Trend Strength: ADX = {adx:.1f} — No clear trend, choppy market (−3).")
+        elif adx >= 25:
             score += 1
             reasons.append(f"Trend Strength: ADX = {adx:.1f} — Strong trend confirmed (+1).")
-        elif adx < 20:
-            score -= 1
-            reasons.append(f"Trend Strength: ADX = {adx:.1f} — Weak/no trend, choppy market (−1).")
         else:
             reasons.append(f"Trend Strength: ADX = {adx:.1f} — Moderate trend.")
 
@@ -317,7 +319,7 @@ def generate_signal(
             reasons.append("Divergence: Bearish RSI divergence — price higher high, RSI lower high.")
 
         # ── 4. Oversold / Overbought ──────────────────────────────────────────
-        if rsi < 30 and stoch_k < 20:
+        if rsi < 25 and stoch_k < 20:
             if is_bullish_trend:
                 score += 4
                 trigger_active = True
@@ -335,7 +337,7 @@ def generate_signal(
                 score -= 1
                 reasons.append("Trigger: Overbought in Bullish trend (potential minor pullback).")
 
-        # ── 5. MA200 Support Test ─────────────────────────────────────────────
+        # ── 5. MA200 Support Test + Bear Penalty ────────────────────────────
         margin = (price - ma200) / ma200
         if 0 < margin < 0.02 and 30 < rsi < 40:
             score += 1
@@ -343,7 +345,14 @@ def generate_signal(
                 f"Structure: Price testing MA200 support ({margin*100:.1f}% above) with RSI near oversold ({rsi:.1f})."
             )
 
-        # ── 6. Stochastic Crossover ───────────────────────────────────────────
+        # Bear market deep penalty:
+        if margin < -0.15:
+            score -= 2
+            reasons.append(
+                f"Structure: Price is {abs(margin)*100:.1f}% below MA200 — Deep Bear trend (−2)."
+            )
+
+                # ── 6. Stochastic Crossover ───────────────────────────────────────────
         if stoch_k > stoch_d and prev_k <= prev_d and stoch_k < 30:
             score += 1
             trigger_active = True
@@ -442,11 +451,11 @@ def generate_signal(
             "adx":              adx,
             "atr":              round(atr, 4),
             "atr_pct":          vol_info["atr_pct"],
-            # ── Time Exit (محسّن) ─────────────────────────────────────────────
+            # ── Time Exit  ─────────────────────────────────────────────
             "time_exit": {
                 "enabled":        True,
                 "days":           5,     
-                "min_profit_pct": 1.5, 
+                "min_profit_pct": 1.5,    
             },
         }
 
