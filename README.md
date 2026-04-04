@@ -1,32 +1,35 @@
 <div align="center">
-  <img src="logo.svg" alt="MarketLab" width="440"/>
-  <br/><br/>
 
-[![Version](https://img.shields.io/badge/version-2.5.0-378ADD?style=for-the-badge)](https://github.com/youcefbt-dz/MarketLab)
-[![Python](https://img.shields.io/badge/python-3.10+-yellow?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
-[![ML Accuracy](https://img.shields.io/badge/ML%20Accuracy-99%25-blueviolet?style=for-the-badge)](https://github.com/youcefbt-dz/MarketLab)
-[![Stars](https://img.shields.io/github/stars/youcefbt-dz/MarketLab?style=for-the-badge&color=yellow)](https://github.com/youcefbt-dz/MarketLab/stargazers)
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue?style=for-the-badge)](LICENSE)
+<img src="logo.svg" alt="MarketLab" width="420"/>
 
-**An open-source quantitative research and trading framework for stock analysis, strategy validation, and financial decision-making.**
+<br/>
 
-[Quick Start](#quick-start) · [Features](#features) · [Backtesting](#backtesting-engine) · [Black Box Logger](#black-box-logger) · [Screenshots](#screenshots) · [Contributing](CONTRIBUTING.md)
+<p>
+  <a href="https://github.com/youcefbt-dz/MarketLab"><img src="https://img.shields.io/badge/version-3.0.0-0F172A?style=for-the-badge&labelColor=1E293B" alt="Version"/></a>
+  <a href="https://python.org"><img src="https://img.shields.io/badge/python-3.10+-F59E0B?style=for-the-badge&logo=python&logoColor=white&labelColor=1E293B" alt="Python"/></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache_2.0-2563EB?style=for-the-badge&labelColor=1E293B" alt="License"/></a>
+  <a href="https://github.com/youcefbt-dz/MarketLab/stargazers"><img src="https://img.shields.io/github/stars/youcefbt-dz/MarketLab?style=for-the-badge&color=F59E0B&labelColor=1E293B" alt="Stars"/></a>
+</p>
+
+**Open-source quantitative research framework — signals, backtesting, sentiment, and Bayesian strategy optimization.**
+
+[Quick Start](#quick-start) · [Architecture](#architecture) · [Features](#features) · [Backtesting](#backtesting-engine) · [Optimizer](#strategy-optimizer) · [Contributing](CONTRIBUTING.md)
 
 </div>
 
 ---
 
-## Overview
+## What is MarketLab?
 
-**MarketLab** is a quantitative research and trading framework built for finance students, researchers, and aspiring quants.
-
-It integrates technical analysis, risk modeling, NLP-driven sentiment analysis, a rule-based signals engine, a full backtesting system, and a **self-improving reliability tracker** into a single modular pipeline — transforming raw market data into actionable intelligence.
+MarketLab is a modular quantitative finance framework built for finance students, researchers, and aspiring quants. It transforms raw market data into structured trading intelligence through a full research pipeline:
 
 ```
-Raw Market Data  →  Technical Indicators  →  Trading Signals  →  Backtesting  →  Black Box Logger  →  ML Predictor
+Market Data  →  Indicators  →  Signals  →  Backtest  →  Optimize  →  Report
 ```
 
->  **Disclaimer:** MarketLab is for educational and research purposes only. It does not constitute financial advice.
+The project is designed to be readable, extensible, and portfolio-ready — with zero dependency on paid APIs or proprietary data.
+
+> **Disclaimer:** MarketLab is built for educational and research purposes only. It does not constitute financial advice.
 
 ---
 
@@ -35,289 +38,263 @@ Raw Market Data  →  Technical Indicators  →  Trading Signals  →  Backtesti
 <div align="center">
 
 ### Executive Summary Report
-<img src="docs/screenshots/screenshot_report.png" width="650"/>
+<img src="docs/screenshots/screenshot_report.png" width="680"/>
 
-<br>
+<br/>
 
 ### News Sentiment Analysis
-<img src="docs/screenshots/screenshot_sentiment.png" width="650"/>
+<img src="docs/screenshots/screenshot_sentiment.png" width="680"/>
 
-<br>
+<br/>
 
 ### Technical Charts
-<img src="docs/screenshots/screenshot_charts.png" width="650"/>
+<img src="docs/screenshots/screenshot_charts.png" width="680"/>
 
 </div>
 
 ---
 
-## Features
+## Architecture
 
-###  Technical Analysis
-| Indicator | Description |
-|-----------|-------------|
-| Moving Averages | MA50, MA200, EMA20, EMA50 |
-| Momentum | RSI (14), MACD, Stochastic %K/%D |
-| Volatility | Bollinger Bands (20, ±2σ), ATR (14) |
-| Trend Strength | ADX (14) |
-| Divergence | RSI/Price Bullish & Bearish Divergence |
+```
+┌──────────────────────────────────────────────────────────────┐
+│  main.py — Entry Point                                       │
+│                                                              │
+│  Mode 1 · Portfolio Analysis    signals + sentiment + PDF    │
+│  Mode 2 · Backtesting           walk-forward simulation      │
+│  Mode 3 · Watchlist Scanner     250+ tickers in parallel     │
+│  Mode 4 · Strategy Optimizer    Bayesian parameter search    │
+│  Mode 5 · Warehouse Manager     local data management        │
+└──────────────────────────────────────────────────────────────┘
+         │                    │                    │
+         ▼                    ▼                    ▼
+   signals.py           backtest.py        strategy_optimizer.py
+   13-rule scoring      walk-forward       Optuna · 26 params
+   ATR exits            gap-aware exits    100 Bayesian trials
+   ADX/regime filter    dynamic sizing     auto-apply to signals
+         │                    │
+         ▼                    ▼
+   sentiment.py        backtest_logger.py
+   VADER + booster      JSON history
+   tail risk detect     reliability score
+         │
+         ▼
+   report_generator.py
+   PDF · ReportLab
+   Goldman Sachs palette
+```
 
-###  Signals Engine
-- **13-indicator scoring system** producing BUY / HOLD / SELL signals
-- **ATR-based Stop Loss** — dynamic SL at 1.5× ATR instead of fixed BB percentage
-- **Dynamic Risk/Reward** — 2.3 / 2.5 / 3.0 based on signal strength and trend
-- **ADX Trend Strength Filter** — only enters when trend is confirmed (ADX ≥ 25)
-- **Volatility Filter** — penalizes or blocks entry during extreme ATR conditions
-- **Market Regime Filter** — S&P 500 MA200 used to switch between Risk-On / Risk-Off
-- **Relative Strength Filter** — only enter stocks outperforming the S&P 500
-- **Sentiment Integration** — news score adjusts the final signal
-- **Divergence Detection** — RSI/Price swing high-low comparison over configurable lookback
-- **Time Exit** — exit if < 1.5% gain in 5 days
+**Data layer:**
 
-###  Sentiment Analysis
-- **VADER NLP** with custom financial keyword boosting (`beats`, `misses`, `downgrade`, etc.)
-- **Time-weighted scoring** — recent news carries more weight (decay over 72h)
-- **Tail Risk detection** — single strong negative news triggers a score adjustment
-- **Confidence scoring** with positive/negative ratio breakdown
-
-###  Risk & Performance Metrics
-- Beta, R², Sharpe Ratio (annualized), Annualized Return
-- Configurable risk-free rate (default: 4%)
-- Cross-asset correlation matrix
-
-###  Seasonality Analysis
-- Best and worst month detection per ticker
-- Monthly average return bar chart exported as PNG
-
-###  Local Data Warehouse
-- **250+ symbols** stored as local CSV files — no repeated API calls
-- Smart incremental updates — only fetches new rows since last download
-- 7-day update interval with automatic staleness detection
-- ~1.8 million rows total across all symbols
-- `load_local(ticker, start, end)` — instant data access for analysis and backtesting
-
-###  Backtesting Engine
-- Walk-forward simulation with zero look-ahead bias
-- Gap-down / gap-up realistic exit pricing
-- Dynamic position sizing (35% for STRONG BUY, 22% for BUY)
-- ATR-based Stop Loss, Dynamic Take Profit, Trailing Stop, Partial Exit, and Time Exit
-- Full metrics: Win Rate, Profit Factor, Sharpe, Max Drawdown, R-Multiple
-
-###  Black Box Logger *(v2.4.0)*
-- Persistent JSON history of every backtest run
-- **Reliability Score (0–100)** computed from accumulated results
-- Per-ticker and per-market-regime breakdown
-- Trend detection: Improving / Stable / Declining
-- ML-ready dataset export for future model training
-
-###  ML Predictor *(v2.5.0)*
-- **RandomForest / GradientBoosting / LogisticRegression** — auto-selects best model via CV AUC
-- **SMOTE** — handles class imbalance by generating synthetic minority samples
-- **Data Purge** — automatically removes demo runs and duplicates before training
-- **quality_trade** target: Sharpe > 0.5 AND Max Drawdown > −12% AND Win Rate > 50%
-- Achieved **AUC = 0.996**, **Quality Recall = 100%** on 72 real backtest records
-
-###  PDF Report Generation
-- Professional executive summary with all indicators, signals, sentiment, and charts
-- Goldman Sachs-inspired color palette with embedded sparklines
+```
+stock_warehouse.py  →  data/AAPL.csv, MSFT.csv, ... (250+ symbols, ~1.8M rows)
+                        load_local(ticker, start, end)  — no internet per run
+```
 
 ---
 
-## Real-World Results
+## Features
 
-After **72 backtests** across 59 tickers (2017–2024):
+### Signals Engine
 
-| Metric | Value |
-|--------|-------|
-| ML Model AUC | **0.996** |
-| Quality Recall | **100%** |
-| Overall Accuracy | **99%** |
-| Best Model | RandomForest |
+A 13-rule scoring system that produces `BUY` / `HOLD` / `SELL` signals with dynamic exit levels.
 
-**Per-ticker reliability (top performers):**
+| Rule | Points |
+|------|--------|
+| Price vs MA200 (trend direction) | ±2 |
+| Golden / Death Cross (MA50 vs MA200) | ±1 |
+| ADX Trend Strength | −3 / +1 |
+| RSI/Price Divergence | ±3 |
+| Double Oversold / Overbought | ±4 |
+| MA200 Support Test | +1 |
+| Bear Market Deep Penalty | −2 |
+| Stochastic Crossover | ±1 |
+| MACD Crossover | ±2 |
+| Bollinger Band Touch | ±2 |
+| Volume Confirmation | ±2 |
+| Volatility Filter (ATR%) | ±1 to ±3 |
+| Market Regime (S&P 500 MA200) | 0 / −3 |
+| Relative Strength vs S&P 500 | ±1 to ±2 |
 
-| Ticker | Score | Runs |
-|--------|-------|------|
-| AAPL | 🟢 92.8 / 100 | 12 |
-| ADBE | 🟢 85.0 / 100 | 1 |
-| GOOGL | 🟢 85.0 / 100 | 2 |
-| NVDA | 🟢 82.1 / 100 | 2 |
-| JPM | 🟢 84.7 / 100 | 1 |
+**Signal thresholds:**
 
-> Results accumulate automatically — each new backtest run refines the reliability model.
+```
+Score ≥  6  →  BUY         (≥ 8 + bullish trend → STRONG BUY)
+Score ≤ −6  →  SELL        (≤ −10 + bearish trend → STRONG SELL)
+Otherwise   →  HOLD
+```
+
+**Filters (v3.1):**
+- `MIN_ADX_ENTRY = 18` — blocks entry in choppy, trendless markets (−3 penalty)
+- Bear market penalty — −2 when price is 15%+ below MA200
+- ATR × 2.5 stop loss — adapts to each stock's actual volatility
+
+### Exit Strategy
+
+| Condition | Risk / Reward |
+|-----------|--------------|
+| Bullish trend + score ≥ 8 | 1 : 3.0 |
+| Bullish trend + score ≥ 6 | 1 : 2.5 |
+| Default | 1 : 2.3 |
+| Bearish score ≤ −8 | 1 : 3.0 |
+
+Stop Loss = `price ± (2.5 × ATR14)` — dynamically sized to each stock's volatility.
+
+---
+
+### Backtesting Engine
+
+Walk-forward simulation with zero look-ahead bias across any date range and ticker.
+
+- **Gap-aware exits** — if Open gaps below SL, exits at Open (not SL price)
+- **Dynamic position sizing** — 35% for STRONG BUY, 22% for BUY, 15% fallback
+- **Portfolio cap** — maximum 70% deployed, 40% per single position
+- **Cooldown logic** — 8 bars idle after a loss (configurable)
+- **Rolling metrics** — Sharpe, Beta, and annualized return pre-computed in O(N)
+- **Full trade log** — entry/exit dates, prices, PnL, R-Multiple, exit reason
+
+**Output per run:**
+
+| Metric | Description |
+|--------|-------------|
+| Total Return | Strategy vs Buy & Hold |
+| Win Rate | % of profitable trades |
+| Profit Factor | Gross profit / gross loss |
+| Sharpe Ratio | Annualized risk-adjusted return |
+| Max Drawdown | Peak-to-trough equity decline |
+| Avg R-Multiple | Realized vs expected risk/reward |
+| Exit Reason Breakdown | TP hits / SL hits / Gap exits |
+
+---
+
+### Strategy Optimizer
+
+Bayesian optimization using **Optuna** to automatically tune signal parameters across 26 dimensions.
+
+```bash
+python strategy_optimizer.py          # run 100 Bayesian trials
+python strategy_optimizer.py --apply  # apply best_params.json to signals.py
+```
+
+**How it works:**
+
+```
+Trial N
+  └─ Suggest 26 params (BUY_THRESHOLD, ATR_mult, RSI levels, ADX, weights...)
+       └─ Run backtest on 7-stock basket (local data, no internet)
+            └─ Score = Sharpe × WinRate / |MaxDD|
+                 └─ Optuna learns → next trial smarter
+                      └─ After 100 trials → save best_params.json
+```
+
+- First 20 trials: random exploration
+- Trials 21–100: TPE Bayesian search (learns from prior results)
+- Results auto-applied to `signals.py` with a timestamped backup
+- Basket: AAPL, MSFT, NVDA, TSLA, JPM, XOM, AMZN
+
+---
+
+### Watchlist Scanner
+
+Scans 250+ tickers in parallel and ranks by signal strength.
+
+```bash
+python watchlist_scanner.py                      # top 20, min score 4
+python watchlist_scanner.py --top 10 --min-score 6
+python watchlist_scanner.py --export results.csv
+```
+
+Output per ticker: signal, score, price, RSI, ADX, ATR%, RS%, stop loss, take profit.
+
+---
+
+### Sentiment Analysis
+
+- **VADER NLP** with custom financial keyword boosting (`beats`, `misses`, `downgrade`, `rally`, etc.)
+- **Time-weighted scoring** — recent news carries more weight (72h decay)
+- **Tail risk detection** — single strong negative headline triggers score adjustment
+- **Confidence scoring** with positive/negative ratio breakdown
+
+---
+
+### Local Data Warehouse
+
+```bash
+python stock_warehouse.py   # download / update all 250+ symbols
+```
+
+- Stores full OHLCV history for 250+ symbols as local CSV files
+- ~1.8 million rows total — no repeated API calls
+- Smart incremental updates — only fetches new rows since last run
+- 7-day update interval with automatic staleness detection
+- All analysis and backtesting reads from disk — fast and offline-capable
+
+---
+
+### Black Box Logger
+
+Every backtest run is automatically persisted to `backtest_history.json`.
+
+**Reliability Score (0–100):**
+
+```
+Score = Pass Rate × 40%
+      + Avg Win Rate × 25%     (target: 65%)
+      + Avg Profit Factor × 20% (target: 2.5)
+      + Beat Benchmark Rate × 15%
+```
+
+Breakdown per ticker and per market regime (Bull / Sideways / Bear).
+
+---
+
+### PDF Report
+
+Professional executive summary generated with ReportLab:
+
+- Signal badge, score, confidence level
+- Market data and indicator table
+- Algorithm trigger breakdown
+- News sentiment badge + headline list
+- 5 technical charts (Price/MA, BB, RSI, MACD, Stochastic)
+- Qualitative financial interpretation
 
 ---
 
 ## Quick Start
 
-### 1. Clone the repository
+**1. Clone**
 
 ```bash
-git clone https://github.com/youcefbt-dz/python-finance-analyst.git
-cd python-finance-analyst
+git clone https://github.com/youcefbt-dz/MarketLab.git
+cd MarketLab
 ```
 
-### 2. Install dependencies
+**2. Install dependencies**
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. Run the analyzer
-
-```bash
-python main.py
-```
-
-You will be prompted to:
-- Choose a mode: **Live Analysis** or **Backtesting**
-- Enter the number of stocks and years of historical data
-- Input company names (e.g. `Apple`, `TSLA`, `NVIDIA`) or ticker symbols
-
-> The fuzzy search engine will resolve names automatically using `companies.json` (240+ companies supported).
-
-### 4. (Recommended) Build the local data warehouse
+**3. Build the local data warehouse** *(recommended first step)*
 
 ```bash
 python stock_warehouse.py
 ```
 
-This downloads **250+ symbols** from Yahoo Finance and stores them as local CSV files. All subsequent analysis and backtesting runs read from disk — no internet required per run, no API rate limits, and dramatically faster execution.
+Downloads 250+ symbols as local CSV files. All subsequent runs read from disk.
 
-```
-data/
-├── AAPL.csv      # ~7,000 rows (full history)
-├── NVDA.csv
-├── MSFT.csv
-├── ...
-└── _metadata.json   # tracks last update date per symbol
-```
-
-> The warehouse auto-updates only symbols older than 7 days — subsequent runs are near-instant.
-
-### 5. Run the backtesting engine
+**4. Run MarketLab**
 
 ```bash
-python backtest.py
+python main.py
 ```
 
-Results are saved to `backtest_results/` and logged automatically to `backtest_history.json`.
-
-### 6. View the reliability report
+**5. Optimize signal parameters** *(optional)*
 
 ```bash
-python backtest_logger.py
-```
-
-### 7. Run the ML predictor
-
-```bash
-python ml_predictor.py
-```
-
----
-
-## How It Works
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                         main.py                             │
-│                                                             │
-│  1. Fetch data           local warehouse→yfinance fallback  │
-│  2. Compute indicators   pandas-ta, scipy, numpy            │
-│  3. Analyze sentiment    VADER + financial booster          │
-│  4. Generate signal      signals.py (13 rules)              │
-│  5. Export charts        matplotlib                         │
-│  6. Generate PDF         reportlab                          │
-└─────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────┐
-│                       backtest.py                           │
-│                                                             │
-│  1. Walk-forward simulation    no look-ahead bias           │
-│  2. Dynamic position sizing    35% / 22% per signal         │
-│  3. Exit management            ATR-SL / TP / Time Exit      │
-│  4. Auto-log results     →     backtest_logger.py           │
-└─────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────┐
-│                   backtest_logger.py                        │
-│                                                             │
-│  1. Persist run to JSON        backtest_history.json        │
-│  2. Compute Reliability Score  weighted 4-factor model      │
-│  3. Per-ticker breakdown       score + pass rate + regime   │
-│  4. Export ML dataset          ready for training           │
-└─────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────┐
-│                    ml_predictor.py                          │
-│                                                             │
-│  1. Data Purge         remove demos + duplicates            │
-│  2. Feature Engineering  16 features from backtest history  │
-│  3. SMOTE              balance quality_trade classes        │
-│  4. Train & Select     3 models → best CV AUC wins          │
-│  5. Predict            probability + confidence + checks    │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### Signal Scoring Logic
-
-```
-Score  ≥  6  →  BUY        (≥ 8 + bullish trend → STRONG BUY)
-Score  ≤ -6  →  SELL       (≤ -10 + bearish trend → STRONG SELL)
-Otherwise    →  HOLD
-```
-
-| Rule | Weight |
-|------|--------|
-| Price vs MA200 (trend) | ±2 |
-| Golden / Death Cross | ±1 |
-| ADX Trend Strength | ±1 |
-| RSI/Price Divergence | ±3 |
-| Double Oversold / Overbought | ±4 |
-| MA200 Support Test | ±1 |
-| Stochastic Crossover | ±1 |
-| MACD Crossover | ±2 |
-| Bollinger Band Touch | ±2 |
-| Volume Confirmation | ±2 |
-| Sharpe Quality Filter | ±2 |
-| Volatility Filter (ATR) | ±1 to ±3 |
-| Market Regime (S&P 500 MA200) | ±3 |
-| Relative Strength vs S&P 500 | ±2 |
-| News Sentiment | ±1 to ±3 |
-
-### Exit Strategy Logic
-
-| Condition | Risk/Reward |
-|-----------|-------------|
-| Bullish trend + score ≥ 8 | 1 : 3.0 |
-| Bullish trend + score ≥ 6 | 1 : 2.5 |
-| Default | 1 : 2.3 |
-| Bearish score ≤ −8 | 1 : 3.0 |
-| Bearish score ≤ −6 | 1 : 2.5 |
-
-Stop Loss = `price ± (1.5 × ATR14)` — adapts to each stock's actual volatility.
-
-### Reliability Score Formula
-
-```
-Reliability Score = Σ (component × weight) × 100
-
-  Pass Rate           × 40%
-  Avg Win Rate        × 25%   (normalized to 65% target)
-  Avg Profit Factor   × 20%   (normalized to 2.5 target)
-  Beat Benchmark Rate × 15%
-```
-
-### ML quality_trade Formula
-
-```
-quality_trade = 1  if:
-    Sharpe Ratio  > 0.5   AND
-    Max Drawdown  > −12%  AND
-    Win Rate      > 50%
-
-quality_trade = 0  otherwise
+python strategy_optimizer.py
+python strategy_optimizer.py --apply
 ```
 
 ---
@@ -325,22 +302,33 @@ quality_trade = 0  otherwise
 ## Project Structure
 
 ```
-python-finance-analyst/
+MarketLab/
 │
-├── main.py               # Entry point — Live Analysis mode
-├── backtest.py           # Backtesting engine (walk-forward)
-├── backtest_logger.py    # Black Box Logger + Reliability Engine
-├── signals.py            # Signal generation (13-rule scoring)
-├── ml_predictor.py       # ML Pipeline (SMOTE + 3 models)
-├── sentiment.py          # NLP sentiment (VADER + boosters)
-├── report_generator.py   # PDF report builder (ReportLab)
-├── stock_warehouse.py    # Local data warehouse (250+ symbols)
-├── companies.json        # 240+ company name → ticker mappings
-├── requirements.txt      # Python dependencies
-├── logo.svg              # Project logo
+├── main.py                  # Entry point — 5 modes
+├── signals.py               # Signal engine (13 rules, ATR exits)
+├── backtest.py              # Walk-forward backtesting engine
+├── backtest_logger.py       # Black Box Logger + reliability score
+├── strategy_optimizer.py    # Bayesian parameter optimizer (Optuna)
+├── watchlist_scanner.py     # Parallel 250+ ticker scanner
+├── sentiment.py             # NLP sentiment (VADER + boosters)
+├── report_generator.py      # PDF report builder (ReportLab)
+├── stock_warehouse.py       # Local data warehouse (250+ symbols)
+│
+├── companies.json           # 240+ name → ticker mappings
+├── requirements.txt
+├── logo.svg
+│
+├── data/                    # Local CSV warehouse (gitignored)
+│   ├── AAPL.csv
+│   ├── MSFT.csv
+│   └── _metadata.json
+│
+├── backtest_results/        # Trade logs, equity curves, reports
+├── backtest_history.json    # Accumulated backtest runs
+├── best_params.json         # Latest optimizer output
 │
 └── docs/
-    └── screenshots/      # Screenshots for README
+    └── screenshots/
 ```
 
 ---
@@ -348,56 +336,63 @@ python-finance-analyst/
 ## Dependencies
 
 ```
-yfinance>=0.2.40        # Market data
-pandas>=2.0.0           # Data manipulation
-pandas-ta>=0.3.14b      # Technical indicators
-scipy>=1.11.0           # Linear regression (Beta, R²)
-numpy>=1.26.0           # Numerical operations
-matplotlib>=3.8.0       # Chart generation
-reportlab>=4.0.0        # PDF report generation
-vaderSentiment>=3.3.2   # NLP sentiment analysis
-thefuzz>=0.22.0         # Fuzzy company name matching
-scikit-learn>=1.3.0     # ML models (RandomForest, etc.)
-imbalanced-learn>=0.11  # SMOTE for class balancing
-flask>=3.0.0            # Optional web interface
-flask-cors>=4.0.0       # CORS for Flask API
+pandas>=2.0.0          numpy>=1.26.0         pandas-ta>=0.3.14b
+yfinance>=0.2.40       scipy>=1.11.0         matplotlib>=3.8.0
+reportlab>=4.0.0       vaderSentiment>=3.3.2  thefuzz>=0.22.0
+flask>=3.0.0           flask-cors>=4.0.0      optuna>=3.0.0
 ```
 
 ---
 
-## Supported Companies
+## Supported Symbols
 
-MarketLab ships with `companies.json` containing **240+ pre-mapped companies** across sectors:
+240+ pre-mapped companies across sectors via `companies.json`:
 
 | Sector | Examples |
-|--------|----------|
-| Tech | Apple, Microsoft, NVIDIA, AMD, Google |
-| Finance | JPMorgan, Goldman Sachs, Visa, Mastercard |
-| Healthcare | Pfizer, Moderna, Eli Lilly, J&J |
-| Consumer | Tesla, Amazon, Nike, Disney, McDonald's |
-| Energy | ExxonMobil, Chevron, Shell, BP |
-| ETFs | SPY, QQQ, GLD, IBIT (Bitcoin ETF) |
+|--------|---------|
+| Technology | AAPL, MSFT, NVDA, AMD, GOOGL, META |
+| Finance | JPM, GS, V, MA, BLK, BAC |
+| Healthcare | LLY, ABBV, JNJ, PFE, MRNA |
+| Consumer | AMZN, TSLA, NKE, DIS, WMT |
+| Energy | XOM, CVX, SHEL, BP, TTE |
+| ETFs | SPY, QQQ, GLD, IBIT, ETHA |
 
 ---
 
 ## Roadmap
 
-- [x] ATR-based dynamic Stop Loss
-- [x] ML model trained on accumulated backtest history
-- [ ] Trailing Stop + Partial Exit implementation
-- [ ] Streamlit dashboard for reliability visualization
-- [ ] Parameter auto-adjustment via feedback loop
+- [x] ATR-based dynamic stop loss
+- [x] Bayesian strategy optimizer (Optuna)
+- [x] Local data warehouse (250+ symbols)
+- [x] Parallel watchlist scanner
+- [x] Black Box reliability logger
+- [ ] Trailing stop + partial exit
+- [ ] Swing trading module (shorter timeframes)
+- [ ] Crypto module (CCXT integration)
+- [ ] React dashboard for live signal monitoring
 
 ---
 
 ## Changelog
 
-[![History](https://img.shields.io/badge/Evolution-History-FF5733?style=for-the-badge&logo=gitbook&logoColor=white)](./SYSTEM_RELEASE_HISTORY.md)
+See [SYSTEM_RELEASE_HISTORY.md](./SYSTEM_RELEASE_HISTORY.md) for full version history.
+
+**v3.0.0** — Strategy Optimizer + Signal improvements
+- Added `strategy_optimizer.py` — 100-trial Bayesian optimization via Optuna
+- Added `MIN_ADX_ENTRY=18` filter — blocks entry in choppy markets
+- Added bear market deep penalty (−2 when price 15%+ below MA200)
+- ATR multiplier 1.5 → 2.5 for wider, more realistic stop losses
+- Upgraded `main.py` Mode 4: ML Predictor → Strategy Optimizer
+
+**v2.8.0** — Watchlist Scanner + Warehouse  
+**v2.5.0** — ML Predictor (SMOTE + 3 models)  
+**v2.4.0** — Black Box Logger + Reliability Score  
 
 ---
+
 ## Contributing
 
-Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a pull request.
+Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a pull request.
 
 ```bash
 git checkout -b feature/your-feature-name
@@ -412,5 +407,5 @@ Licensed under the **Apache License 2.0** — see [LICENSE](LICENSE) for details
 ---
 
 <div align="center">
-Made with ❤️ for the quant community
+<sub>Built for the quant community · Made in Algeria 🇩🇿</sub>
 </div>
