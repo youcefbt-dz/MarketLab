@@ -1,228 +1,32 @@
-<svg width="600" height="160" viewBox="0 0 600 160" xmlns="http://www.w3.org/2000/svg">
-
+<svg width="480" height="120" viewBox="0 0 480 120" xmlns="http://www.w3.org/2000/svg">
   <defs>
-
-    <!-- Primary gradient: cold blue → electric indigo -->
-    <linearGradient id="gradMain" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%"   stop-color="#38bdf8"/>
-      <stop offset="55%"  stop-color="#6366f1"/>
-      <stop offset="100%" stop-color="#818cf8"/>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563eb"/>
+      <stop offset="100%" stop-color="#4f46e5"/>
     </linearGradient>
-
-    <!-- Pulse line gradient -->
-    <linearGradient id="gradPulse" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%"   stop-color="#38bdf8" stop-opacity="0"/>
-      <stop offset="40%"  stop-color="#38bdf8"/>
-      <stop offset="70%"  stop-color="#6366f1"/>
-      <stop offset="100%" stop-color="#818cf8" stop-opacity="0.4"/>
-    </linearGradient>
-
-    <!-- Glow filter for pulse -->
-    <filter id="pulseGlow" x="-20%" y="-80%" width="140%" height="260%">
-      <feGaussianBlur stdDeviation="2.5" result="blur"/>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
-
-    <!-- Subtle glow for dot -->
-    <filter id="dotGlow" x="-100%" y="-100%" width="300%" height="300%">
-      <feGaussianBlur stdDeviation="4" result="blur"/>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
-
-    <!-- Icon background subtle glow -->
-    <filter id="boxGlow" x="-10%" y="-10%" width="120%" height="120%">
-      <feGaussianBlur stdDeviation="6" result="blur"/>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
-
-    <!-- Clip for icon interior -->
-    <clipPath id="iconClip">
-      <rect x="18" y="18" width="124" height="124" rx="22"/>
-    </clipPath>
-
   </defs>
 
-  <!-- ══════════════════════════════════════
-       ICON BOX
-  ══════════════════════════════════════ -->
+  <!-- Icon: single clean shape — rising bar with a dot -->
+  <rect x="20" y="20" width="80" height="80" rx="20" fill="url(#g)"/>
 
-  <!-- Outer glow layer -->
-  <rect x="18" y="18" width="124" height="124" rx="22"
-        fill="none" stroke="url(#gradMain)" stroke-width="0.8"
-        opacity="0.25" filter="url(#boxGlow)"/>
+  <!-- Three bars growing left to right — minimal -->
+  <rect x="34" y="72" width="12" height="20" rx="3" fill="white" opacity="0.4"/>
+  <rect x="52" y="56" width="12" height="36" rx="3" fill="white" opacity="0.7"/>
+  <rect x="70" y="38" width="12" height="54" rx="3" fill="white"/>
 
-  <!-- Main icon background -->
-  <rect x="18" y="18" width="124" height="124" rx="22" fill="#03060f"/>
+  <!-- Signal dot above tallest bar -->
+  <circle cx="76" cy="32" r="5" fill="white"/>
 
-  <!-- Border -->
-  <rect x="18" y="18" width="124" height="124" rx="22"
-        fill="none" stroke="url(#gradMain)" stroke-width="1.2" opacity="0.5"/>
+  <!-- Wordmark -->
+  <text x="120" y="72"
+        font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+        font-size="40" font-weight="700" letter-spacing="-1"
+        fill="#0f172a">Market<tspan fill="url(#g)">Lab</tspan></text>
 
-  <!-- Inner corner bracket marks — precision feel -->
-  <g stroke="#38bdf8" stroke-width="1.2" opacity="0.35" stroke-linecap="round">
-    <!-- top-left -->
-    <line x1="26" y1="36" x2="26" y2="26"/>
-    <line x1="26" y1="26" x2="36" y2="26"/>
-    <!-- top-right -->
-    <line x1="134" y1="36" x2="134" y2="26"/>
-    <line x1="134" y1="26" x2="124" y2="26"/>
-    <!-- bottom-left -->
-    <line x1="26" y1="124" x2="26" y2="134"/>
-    <line x1="26" y1="134" x2="36" y2="134"/>
-    <!-- bottom-right -->
-    <line x1="134" y1="124" x2="134" y2="134"/>
-    <line x1="134" y1="134" x2="124" y2="134"/>
-  </g>
-
-  <!-- Clipped interior content -->
-  <g clip-path="url(#iconClip)">
-
-    <!-- Subtle grid — very faint -->
-    <g stroke="#1e3a5f" stroke-width="0.5" opacity="0.4">
-      <line x1="18"  y1="59"  x2="142" y2="59"/>
-      <line x1="18"  y1="80"  x2="142" y2="80"/>
-      <line x1="18"  y1="101" x2="142" y2="101"/>
-      <line x1="59"  y1="18"  x2="59"  y2="142"/>
-      <line x1="80"  y1="18"  x2="80"  y2="142"/>
-      <line x1="101" y1="18"  x2="101" y2="142"/>
-    </g>
-
-    <!-- Area fill under pulse -->
-    <path d="M18 142 L18 100
-             L32 100 L40 85 L50 100
-             L58 60 L66 110 L74 42 L80 82
-             L88 62 L96 88 L104 50
-             L110 88 L118 70 L130 78 L142 72
-             L142 142 Z"
-          fill="url(#gradMain)" opacity="0.06"/>
-
-  </g>
-
-  <!-- ══════════════════════════════════════
-       THE CORE SYMBOL:
-       A Σ (sigma) morphed into a pulse/EKG
-       traversing a crosshair target
-  ══════════════════════════════════════ -->
-
-  <!-- Horizontal baseline -->
-  <line x1="30" y1="80" x2="56" y2="80"
-        stroke="url(#gradPulse)" stroke-width="1" opacity="0.5"/>
-  <line x1="104" y1="80" x2="130" y2="80"
-        stroke="url(#gradPulse)" stroke-width="1" opacity="0.5"/>
-
-  <!-- THE PULSE — main centerpiece, sigma-shaped EKG -->
-  <!-- Reads as: flat → sharp rise → deep trough → sharp spike → return to flat -->
-  <!-- This is a unique Σ + ECG hybrid -->
-  <path d="
-    M30  80
-    L50  80
-    L58  58
-    L66 104
-    L74  42
-    L80  80
-    L88  62
-    L96  90
-    L104 50
-    L110 80
-    L130 80
-  "
-    stroke="url(#gradPulse)"
-    stroke-width="2.8"
-    fill="none"
-    stroke-linecap="round"
-    stroke-linejoin="round"
-    filter="url(#pulseGlow)"
-  />
-
-  <!-- Target crosshair at peak point (x=74, y=42) -->
-  <!-- Horizontal cross -->
-  <line x1="66" y1="42" x2="82" y2="42" stroke="#38bdf8" stroke-width="0.8" opacity="0.6"/>
-  <!-- Vertical cross -->
-  <line x1="74" y1="34" x2="74" y2="50" stroke="#38bdf8" stroke-width="0.8" opacity="0.6"/>
-  <!-- Outer ring -->
-  <circle cx="74" cy="42" r="9" fill="none" stroke="#6366f1" stroke-width="0.8" opacity="0.5"/>
-  <!-- Inner dot — the live signal -->
-  <circle cx="74" cy="42" r="3.5" fill="#38bdf8" filter="url(#dotGlow)"/>
-  <circle cx="74" cy="42" r="1.5" fill="white"/>
-
-  <!-- Live endpoint dot (rightmost of pulse) -->
-  <circle cx="130" cy="80" r="2.5" fill="#818cf8" opacity="0.7"/>
-
-  <!-- ══════════════════════════════════════
-       TYPOGRAPHY
-  ══════════════════════════════════════ -->
-
-  <!-- Main wordmark -->
-  <text
-    x="164" y="84"
-    font-family="'Courier New', Courier, monospace"
-    font-size="52"
-    font-weight="700"
-    letter-spacing="-1.5"
-    fill="white">Market</text>
-
-  <text
-    x="408" y="84"
-    font-family="'Courier New', Courier, monospace"
-    font-size="52"
-    font-weight="700"
-    letter-spacing="-1.5"
-    fill="url(#gradMain)">Lab</text>
-
-  <!-- Cursor — terminal feel -->
-  <rect x="501" y="42" width="5" height="42" rx="1"
-        fill="#6366f1" opacity="0.85"/>
-
-  <!-- Subtitle: monospace tracking -->
-  <text
-    x="166" y="112"
-    font-family="'Courier New', Courier, monospace"
-    font-size="11"
-    font-weight="400"
-    letter-spacing="3.5"
-    fill="#334155">QUANTITATIVE RESEARCH FRAMEWORK</text>
-
-  <!-- Thin separator line -->
-  <line x1="166" y1="122" x2="520" y2="122"
-        stroke="#1e293b" stroke-width="0.8"/>
-
-  <!-- Meta info row -->
-  <text x="166" y="138"
-        font-family="'Courier New', Courier, monospace"
-        font-size="9" letter-spacing="2" fill="#1e3a5f">v3.1</text>
-
-  <text x="198" y="138"
-        font-family="'Courier New', Courier, monospace"
-        font-size="9" letter-spacing="0" fill="#1e3a5f">·</text>
-
-  <text x="208" y="138"
-        font-family="'Courier New', Courier, monospace"
-        font-size="9" letter-spacing="2" fill="#1e3a5f">python</text>
-
-  <text x="258" y="138"
-        font-family="'Courier New', Courier, monospace"
-        font-size="9" letter-spacing="0" fill="#1e3a5f">·</text>
-
-  <text x="268" y="138"
-        font-family="'Courier New', Courier, monospace"
-        font-size="9" letter-spacing="2" fill="#1e3a5f">open-source</text>
-
-  <text x="358" y="138"
-        font-family="'Courier New', Courier, monospace"
-        font-size="9" letter-spacing="0" fill="#1e3a5f">·</text>
-
-  <text x="368" y="138"
-        font-family="'Courier New', Courier, monospace"
-        font-size="9" letter-spacing="2" fill="#1e3a5f">MIT</text>
+  <!-- Tagline -->
+  <text x="122" y="96"
+        font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+        font-size="11.5" font-weight="500" letter-spacing="2.5"
+        fill="#94a3b8">QUANTITATIVE RESEARCH FRAMEWORK</text>
 
 </svg>
