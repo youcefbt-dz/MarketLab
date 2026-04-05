@@ -1,4 +1,26 @@
-<svg width="480" height="280" viewBox="0 0 480 280" xmlns="http://www.w3.org/2000/svg">
+<svg width="400" height="120" viewBox="0 0 400 120" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    /* الألوان الافتراضية (Light Mode) */
+    :root {
+      --bg-color: transparent;
+      --text-main: #0f172a;
+      --text-sub: #94a3b8;
+      --icon-white: #ffffff;
+    }
+
+    /* التغيير التلقائي عند تفعيل الـ Dark Mode */
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --text-main: #f8fafc;
+        --text-sub: #475569;
+      }
+    }
+
+    .main-text { fill: var(--text-main); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    .sub-text { fill: var(--text-sub); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    .accent { fill: url(#g); }
+  </style>
+
   <defs>
     <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#2563eb"/>
@@ -6,53 +28,17 @@
     </linearGradient>
   </defs>
 
-  <!-- ── LIGHT MODE (top) ── -->
-  <rect width="480" height="130" fill="#ffffff"/>
+  <rect x="10" y="20" width="80" height="80" rx="20" fill="url(#g)"/>
+  <rect x="24" y="72" width="12" height="20" rx="3" fill="white" opacity="0.4"/>
+  <rect x="42" y="56" width="12" height="36" rx="3" fill="white" opacity="0.7"/>
+  <rect x="60" y="38" width="12" height="54" rx="3" fill="white"/>
+  <circle cx="66" cy="32" r="5" fill="white"/>
 
-  <rect x="20" y="25" width="80" height="80" rx="20" fill="url(#g)"/>
-  <rect x="34" y="77" width="12" height="20" rx="3" fill="white" opacity="0.4"/>
-  <rect x="52" y="61" width="12" height="36" rx="3" fill="white" opacity="0.7"/>
-  <rect x="70" y="43" width="12" height="54" rx="3" fill="white"/>
-  <circle cx="76" cy="37" r="5" fill="white"/>
-
-  <text x="120" y="75"
-        font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-        font-size="40" font-weight="700" letter-spacing="-1"
-        fill="#0f172a">Market<tspan fill="url(#g)">Lab</tspan></text>
-
-  <text x="122" y="100"
-        font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-        font-size="11" font-weight="500" letter-spacing="2.5"
-        fill="#94a3b8">QUANTITATIVE RESEARCH FRAMEWORK</text>
-
-  <text x="20" y="122"
-        font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-        font-size="9" letter-spacing="1.5" fill="#cbd5e1">LIGHT MODE</text>
-
-  <!-- ── DIVIDER ── -->
-  <rect y="130" width="480" height="1" fill="#e2e8f0"/>
-
-  <!-- ── DARK MODE (bottom) ── -->
-  <rect y="131" width="480" height="149" fill="#0f172a"/>
-
-  <rect x="20" y="156" width="80" height="80" rx="20" fill="url(#g)"/>
-  <rect x="34" y="208" width="12" height="20" rx="3" fill="white" opacity="0.4"/>
-  <rect x="52" y="192" width="12" height="36" rx="3" fill="white" opacity="0.7"/>
-  <rect x="70" y="174" width="12" height="54" rx="3" fill="white"/>
-  <circle cx="76" cy="168" r="5" fill="white"/>
-
-  <text x="120" y="206"
-        font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-        font-size="40" font-weight="700" letter-spacing="-1"
-        fill="#f8fafc">Market<tspan fill="url(#g)">Lab</tspan></text>
-
-  <text x="122" y="231"
-        font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-        font-size="11" font-weight="500" letter-spacing="2.5"
-        fill="#475569">QUANTITATIVE RESEARCH FRAMEWORK</text>
-
-  <text x="20" y="265"
-        font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-        font-size="9" letter-spacing="1.5" fill="#1e293b">DARK MODE</text>
-
+  <text x="110" y="70" font-size="40" font-weight="700" letter-spacing="-1" class="main-text">
+    Market<tspan class="accent">Lab</tspan>
+  </text>
+  
+  <text x="112" y="95" font-size="11" font-weight="500" letter-spacing="2.5" class="sub-text">
+    QUANTITATIVE RESEARCH FRAMEWORK
+  </text>
 </svg>
