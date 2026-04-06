@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MarketLab — Quantitative Research Framework</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg: #080C10;
+  --bg2: #0D1117;
+  --bg3: #111820;
+  --border: rgba(255,255,255,0.07);
+  --border-bright: rgba(255,255,255,0.14);
+  --gold: #C9A84C;
+  --gold-dim: rgba(201,168,76,0.15);
+  --gold-glow: rgba(201,168,76,0.06);
+  --white: #F0EDE8;
+  --muted: rgba(240,237,232,0.45);
+  --muted2: rgba(240,237,232,0.25);
+  --green: #22C55E;
+  --red: #EF4444;
+  --blue: #3B82F6;
+  --cyan: #06B6D4;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--white);
+  font-family: 'Syne', sans-serif;
+  overflow-x: hidden;
+  cursor: default;
+}
+
+/* ── NOISE OVERLAY ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  opacity: 0.025;
+  pointer-events: none;
+  z-index: 999;
+}
+
+/* ── NAV ── */
+nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 48px;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.3s, background 0.3s;
+}
+nav.scrolled {
+  background: rgba(8,12,16,0.92);
+  backdrop-filter: blur(20px);
+  border-color: var(--border);
+}
+.nav-logo {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--white);
+  text-decoration: none;
+}
+.nav-logo span { color: var(--gold); }
+.nav-links {
+  display: flex;
+  gap: 36px;
+  list-style: none;
+}
+.nav-links a {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.nav-links a:hover { color: var(--white); }
+.nav-cta {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gold);
+  border: 1px solid rgba(201,168,76,0.4);
+  padding: 8px 18px;
+  text-decoration: none;
+  transition: background 0.2s, border-color 0.2s;
+}
+.nav-cta:hover { background: var(--gold-dim); border-color: var(--gold); }
+
+/* ── HERO ── */
+.hero {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  padding: 120px 48px 80px;
+  text-align: center;
+  overflow: hidden;
+}
+
+/* Grid background */
+.hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(201,168,76,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(201,168,76,0.04) 1px, transparent 1px);
+  background-size: 60px 60px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, black 30%, transparent 100%);
+}
+
+/* Glow orb */
+.hero-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -60%);
+  width: 700px;
+  height: 500px;
+  background: radial-gradient(ellipse, rgba(201,168,76,0.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.hero-badge {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--gold);
+  border: 1px solid rgba(201,168,76,0.3);
+  padding: 6px 16px;
+  display: inline-block;
+  margin-bottom: 40px;
+  position: relative;
+  z-index: 1;
+  animation: fadeUp 0.8s ease both;
+}
+
+.hero-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(56px, 9vw, 110px);
+  font-weight: 300;
+  line-height: 0.92;
+  letter-spacing: -0.01em;
+  position: relative;
+  z-index: 1;
+  animation: fadeUp 0.8s 0.1s ease both;
+}
+.hero-title em {
+  font-style: italic;
+  color: var(--gold);
+}
+
+.hero-sub {
+  font-family: 'DM Mono', monospace;
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--muted);
+  max-width: 520px;
+  margin: 32px auto 0;
+  position: relative;
+  z-index: 1;
+  animation: fadeUp 0.8s 0.2s ease both;
+}
+
+.hero-pipeline {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--muted2);
+  margin: 40px auto 0;
+  position: relative;
+  z-index: 1;
+  animation: fadeUp 0.8s 0.3s ease both;
+}
+.hero-pipeline span { color: var(--gold); opacity: 0.7; margin: 0 8px; }
+
+.hero-actions {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  margin-top: 48px;
+  position: relative;
+  z-index: 1;
+  animation: fadeUp 0.8s 0.4s ease both;
+}
+
+.btn-primary {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--bg);
+  background: var(--gold);
+  padding: 14px 32px;
+  text-decoration: none;
+  transition: opacity 0.2s, transform 0.2s;
+}
+.btn-primary:hover { opacity: 0.88; transform: translateY(-1px); }
+
+.btn-secondary {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--white);
+  border: 1px solid var(--border-bright);
+  padding: 14px 32px;
+  text-decoration: none;
+  transition: border-color 0.2s, transform 0.2s;
+}
+.btn-secondary:hover { border-color: rgba(255,255,255,0.3); transform: translateY(-1px); }
+
+/* Stars badge */
+.hero-stars {
+  margin-top: 32px;
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--muted2);
+  position: relative;
+  z-index: 1;
+  animation: fadeUp 0.8s 0.5s ease both;
+}
+.hero-stars strong { color: var(--gold); }
+
+/* ── TICKER TAPE ── */
+.ticker-wrap {
+  width: 100%;
+  overflow: hidden;
+  background: var(--bg2);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 0;
+}
+.ticker-inner {
+  display: flex;
+  gap: 0;
+  animation: ticker 30s linear infinite;
+  width: max-content;
+}
+.ticker-item {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  padding: 0 32px;
+  white-space: nowrap;
+  border-right: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ticker-item .sym { color: var(--muted); letter-spacing: 0.08em; }
+.ticker-item .val { color: var(--white); }
+.ticker-item .chg.up { color: var(--green); }
+.ticker-item .chg.dn { color: var(--red); }
+
+@keyframes ticker {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+/* ── SECTION BASE ── */
+section { padding: 100px 48px; }
+.section-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 16px;
+}
+.section-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(36px, 5vw, 56px);
+  font-weight: 300;
+  line-height: 1.05;
+}
+.section-title em { font-style: italic; color: var(--gold); }
+
+/* ── PIPELINE SECTION ── */
+.pipeline-section {
+  max-width: 1100px;
+  margin: 0 auto;
+  text-align: center;
+}
+.pipeline-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  margin-top: 64px;
+  flex-wrap: wrap;
+}
+.pipe-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.5s, transform 0.5s;
+}
+.pipe-node.visible { opacity: 1; transform: translateY(0); }
+.pipe-node .icon {
+  width: 52px;
+  height: 52px;
+  border: 1px solid var(--border-bright);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  background: var(--bg3);
+  transition: border-color 0.3s, background 0.3s;
+}
+.pipe-node:hover .icon { border-color: var(--gold); background: var(--gold-dim); }
+.pipe-node .label {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.pipe-arrow {
+  font-family: 'DM Mono', monospace;
+  font-size: 14px;
+  color: var(--border-bright);
+  padding: 0 4px;
+  margin-bottom: 22px;
+}
+
+/* ── FEATURES GRID ── */
+.features-section { max-width: 1100px; margin: 0 auto; }
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  margin-top: 56px;
+}
+.feat-card {
+  background: var(--bg);
+  padding: 36px 32px;
+  transition: background 0.3s;
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 0.5s, transform 0.5s, background 0.3s;
+}
+.feat-card.visible { opacity: 1; transform: translateY(0); }
+.feat-card:hover { background: var(--bg3); }
+.feat-num {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: var(--gold);
+  letter-spacing: 0.1em;
+  margin-bottom: 20px;
+}
+.feat-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 22px;
+  font-weight: 400;
+  margin-bottom: 12px;
+  line-height: 1.2;
+}
+.feat-desc {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  line-height: 1.8;
+  color: var(--muted);
+}
+.feat-tag {
+  display: inline-block;
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gold);
+  border: 1px solid rgba(201,168,76,0.25);
+  padding: 3px 8px;
+  margin-top: 16px;
+}
+
+/* ── SIGNALS TABLE ── */
+.signals-section {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 64px;
+  align-items: start;
+}
+.signals-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 40px;
+}
+.signals-table th {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--muted2);
+  text-align: left;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.signals-table td {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  vertical-align: middle;
+}
+.signals-table td:last-child { text-align: right; color: var(--gold); }
+.signals-table tr:hover td { color: var(--white); }
+
+.threshold-box {
+  margin-top: 40px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.thresh-row {
+  display: flex;
+  align-items: center;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  gap: 16px;
+}
+.thresh-row:last-child { border-bottom: none; }
+.thresh-badge {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  padding: 4px 12px;
+  min-width: 100px;
+  text-align: center;
+}
+.thresh-badge.sb { background: rgba(34,197,94,0.15); color: #22C55E; border: 1px solid rgba(34,197,94,0.3); }
+.thresh-badge.b { background: rgba(59,130,246,0.1); color: #60A5FA; border: 1px solid rgba(59,130,246,0.25); }
+.thresh-badge.h { background: rgba(255,255,255,0.05); color: var(--muted); border: 1px solid var(--border); }
+.thresh-badge.s { background: rgba(239,68,68,0.1); color: #F87171; border: 1px solid rgba(239,68,68,0.25); }
+.thresh-badge.ss { background: rgba(239,68,68,0.15); color: #EF4444; border: 1px solid rgba(239,68,68,0.3); }
+.thresh-cond {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* ── OPTIMIZER ── */
+.optimizer-section {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.optimizer-visual {
+  margin-top: 56px;
+  border: 1px solid var(--border);
+  background: var(--bg2);
+  padding: 40px;
+  position: relative;
+  overflow: hidden;
+}
+.optimizer-visual::before {
+  content: '';
+  position: absolute;
+  top: -60px; right: -60px;
+  width: 300px; height: 300px;
+  background: radial-gradient(circle, rgba(201,168,76,0.06), transparent 70%);
+}
+.opt-flow {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.opt-step {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--border);
+  opacity: 0;
+  transform: translateX(-16px);
+  transition: opacity 0.5s, transform 0.5s;
+}
+.opt-step.visible { opacity: 1; transform: translateX(0); }
+.opt-step:last-child { border-bottom: none; }
+.opt-step-num {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: var(--gold);
+  min-width: 32px;
+  padding-top: 2px;
+}
+.opt-step-content {}
+.opt-step-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.opt-step-desc {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+.opt-step-desc code {
+  color: var(--gold);
+  font-size: 10px;
+}
+
+.opt-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  margin-top: 32px;
+}
+.opt-stat {
+  background: var(--bg);
+  padding: 24px 20px;
+  text-align: center;
+}
+.opt-stat .val {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 36px;
+  font-weight: 300;
+  color: var(--gold);
+  line-height: 1;
+}
+.opt-stat .lbl {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted2);
+  margin-top: 6px;
+}
+
+/* ── QUICKSTART ── */
+.quickstart-section {
+  max-width: 860px;
+  margin: 0 auto;
+  text-align: center;
+}
+.code-block {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  padding: 32px 36px;
+  text-align: left;
+  margin-top: 48px;
+  position: relative;
+}
+.code-block::before {
+  content: attr(data-label);
+  position: absolute;
+  top: -1px; right: 20px;
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold);
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-top: none;
+  padding: 3px 10px;
+}
+.code-block pre {
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  line-height: 2;
+  color: var(--muted);
+  overflow-x: auto;
+}
+.code-block pre .cmd { color: var(--white); }
+.code-block pre .comment { color: var(--muted2); }
+.code-block pre .highlight { color: var(--gold); }
+
+/* ── ROADMAP ── */
+.roadmap-section { max-width: 860px; margin: 0 auto; }
+.roadmap-list { margin-top: 48px; }
+.roadmap-item {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--border);
+}
+.roadmap-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.roadmap-dot.done { background: var(--green); box-shadow: 0 0 8px rgba(34,197,94,0.4); }
+.roadmap-dot.pending { background: transparent; border: 1px solid var(--muted2); }
+.roadmap-text {
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  color: var(--muted);
+}
+.roadmap-text.done { color: var(--white); }
+.roadmap-version {
+  margin-left: auto;
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  color: var(--gold);
+  letter-spacing: 0.1em;
+}
+
+/* ── FOOTER ── */
+footer {
+  border-top: 1px solid var(--border);
+  padding: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.footer-logo {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 20px;
+  font-weight: 300;
+  color: var(--muted);
+}
+.footer-logo strong { color: var(--white); font-weight: 600; }
+.footer-links {
+  display: flex;
+  gap: 28px;
+}
+.footer-links a {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted2);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.footer-links a:hover { color: var(--white); }
+.footer-right {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: var(--muted2);
+  text-align: right;
+}
+
+/* ── ANIMATIONS ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── DIVIDER ── */
+.divider {
+  width: 100%;
+  height: 1px;
+  background: var(--border);
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 900px) {
+  nav { padding: 16px 24px; }
+  .nav-links { display: none; }
+  section { padding: 72px 24px; }
+  .features-grid { grid-template-columns: 1fr; }
+  .signals-section { grid-template-columns: 1fr; gap: 40px; }
+  .opt-stats { grid-template-columns: repeat(2, 1fr); }
+  footer { flex-direction: column; gap: 24px; text-align: center; }
+  .footer-links { justify-content: center; }
+  .footer-right { text-align: center; }
+  .pipeline-row { gap: 4px; }
+  .pipe-arrow { font-size: 10px; padding: 0 2px; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav id="nav">
+  <a href="#" class="nav-logo">Market<span>Lab</span></a>
+  <ul class="nav-links">
+    <li><a href="#features">Features</a></li>
+    <li><a href="#signals">Signals</a></li>
+    <li><a href="#optimizer">Optimizer</a></li>
+    <li><a href="#quickstart">Quick Start</a></li>
+  </ul>
+  <a href="https://github.com/youcefbt-dz/MarketLab" class="nav-cta" target="_blank">GitHub ↗</a>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-glow"></div>
+  <div class="hero-badge">v3.1.0 · Open Source · Apache 2.0</div>
+  <h1 class="hero-title">Quantitative<br/><em>Research</em><br/>Framework</h1>
+  <p class="hero-sub">
+    Signals · Backtesting · Sentiment · Bayesian Optimization.<br/>
+    Built for finance researchers and aspiring quants.<br/>
+    Zero paid APIs. Fully offline-capable.
+  </p>
+  <p class="hero-pipeline">
+    Market Data <span>→</span> Indicators <span>→</span> Signals <span>→</span> Backtest <span>→</span> Optimize <span>→</span> Report
+  </p>
+  <div class="hero-actions">
+    <a href="https://github.com/youcefbt-dz/MarketLab" class="btn-primary" target="_blank">View on GitHub</a>
+    <a href="#quickstart" class="btn-secondary">Quick Start</a>
+  </div>
+  <p class="hero-stars">⭐ <strong>7 stars</strong> · Python · Made in Algeria 🇩🇿</p>
+</section>
+
+<!-- TICKER TAPE -->
+<div class="ticker-wrap">
+  <div class="ticker-inner" id="ticker"></div>
+</div>
+
+<!-- PIPELINE -->
+<section>
+  <div class="pipeline-section">
+    <div class="section-label">Architecture</div>
+    <h2 class="section-title">Five Modes, One <em>Unified</em> Framework</h2>
+    <div class="pipeline-row" id="pipeline">
+      <div class="pipe-node"><div class="icon">📊</div><div class="label">Portfolio<br/>Analysis</div></div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-node"><div class="icon">⏱</div><div class="label">Backtest<br/>Engine</div></div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-node"><div class="icon">🔍</div><div class="label">Watchlist<br/>Scanner</div></div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-node"><div class="icon">🧠</div><div class="label">Strategy<br/>Optimizer</div></div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-node"><div class="icon">🗄</div><div class="label">Warehouse<br/>Manager</div></div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="features-section">
+    <div class="section-label">Core Modules</div>
+    <h2 class="section-title">Every Layer of the<br/><em>Research Pipeline</em></h2>
+    <div class="features-grid" id="features-grid">
+
+      <div class="feat-card">
+        <div class="feat-num">01</div>
+        <div class="feat-title">Signals Engine</div>
+        <div class="feat-desc">13-rule scoring system producing BUY / HOLD / SELL signals. ADX regime filter blocks entries in choppy markets. ATR × 2.5 dynamic stop loss adapts to each stock's volatility.</div>
+        <span class="feat-tag">13 Rules · ATR Exits</span>
+      </div>
+
+      <div class="feat-card">
+        <div class="feat-num">02</div>
+        <div class="feat-title">Backtesting Engine</div>
+        <div class="feat-desc">Walk-forward simulation with zero look-ahead bias. Gap-aware exits, dynamic position sizing (15–35%), cooldown logic, and full R-Multiple tracking across any date range.</div>
+        <span class="feat-tag">Walk-Forward · No Bias</span>
+      </div>
+
+      <div class="feat-card">
+        <div class="feat-num">03</div>
+        <div class="feat-title">Strategy Optimizer</div>
+        <div class="feat-desc">Bayesian optimization via Optuna across 26 signal parameters. 100 trials with TPE search. Auto-applies best parameters to signals.py with timestamped backup.</div>
+        <span class="feat-tag">Optuna · 26 Params</span>
+      </div>
+
+      <div class="feat-card">
+        <div class="feat-num">04</div>
+        <div class="feat-title">Watchlist Scanner</div>
+        <div class="feat-desc">Scans 250+ tickers in parallel and ranks by signal strength. Exports to CSV. Configurable minimum score threshold and result count.</div>
+        <span class="feat-tag">250+ Tickers · Parallel</span>
+      </div>
+
+      <div class="feat-card">
+        <div class="feat-num">05</div>
+        <div class="feat-title">Sentiment Analysis</div>
+        <div class="feat-desc">VADER NLP with custom financial keyword boosting. Time-weighted scoring with 72h decay. Tail risk detection triggers automatic score adjustment on strong negative headlines.</div>
+        <span class="feat-tag">VADER · Time-Weighted</span>
+      </div>
+
+      <div class="feat-card">
+        <div class="feat-num">06</div>
+        <div class="feat-title">PDF Report</div>
+        <div class="feat-desc">Professional executive summary via ReportLab. Signal badge, indicator table, algorithm trigger breakdown, sentiment section, and 5 embedded technical charts.</div>
+        <span class="feat-tag">ReportLab · 5 Charts</span>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- SIGNALS TABLE -->
+<section id="signals">
+  <div class="signals-section">
+    <div>
+      <div class="section-label">Signal Rules</div>
+      <h2 class="section-title">13-Rule<br/><em>Scoring</em><br/>System</h2>
+      <table class="signals-table">
+        <thead>
+          <tr><th>Rule</th><th style="text-align:right">Points</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Price vs MA200 (trend)</td><td>±2</td></tr>
+          <tr><td>Golden / Death Cross</td><td>±1</td></tr>
+          <tr><td>ADX Trend Strength</td><td>−3 / +1</td></tr>
+          <tr><td>RSI / Price Divergence</td><td>±3</td></tr>
+          <tr><td>Double Oversold / Overbought</td><td>±4</td></tr>
+          <tr><td>MA200 Support Test</td><td>+1</td></tr>
+          <tr><td>Bear Market Deep Penalty</td><td>−2</td></tr>
+          <tr><td>Stochastic Crossover</td><td>±1</td></tr>
+          <tr><td>MACD Crossover</td><td>±2</td></tr>
+          <tr><td>Bollinger Band Touch</td><td>±2</td></tr>
+          <tr><td>Volume Confirmation</td><td>±2</td></tr>
+          <tr><td>Volatility Filter (ATR%)</td><td>±1–3</td></tr>
+          <tr><td>Market Regime (S&P 500)</td><td>0 / −3</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div>
+      <div class="section-label">Thresholds</div>
+      <h2 class="section-title">Signal<br/><em>Classification</em></h2>
+      <div class="threshold-box" style="margin-top:40px">
+        <div class="thresh-row">
+          <span class="thresh-badge sb">STRONG BUY</span>
+          <span class="thresh-cond">Score ≥ 8 + bullish trend → 35% allocation</span>
+        </div>
+        <div class="thresh-row">
+          <span class="thresh-badge b">BUY</span>
+          <span class="thresh-cond">Score ≥ 6 → 22% allocation</span>
+        </div>
+        <div class="thresh-row">
+          <span class="thresh-badge h">HOLD</span>
+          <span class="thresh-cond">Between thresholds → 0% (no entry)</span>
+        </div>
+        <div class="thresh-row">
+          <span class="thresh-badge s">SELL</span>
+          <span class="thresh-cond">Score ≤ −6 → exit position</span>
+        </div>
+        <div class="thresh-row">
+          <span class="thresh-badge ss">STRONG SELL</span>
+          <span class="thresh-cond">Score ≤ −10 + bearish trend</span>
+        </div>
+      </div>
+      <div style="margin-top:24px; padding:20px; border:1px solid var(--border); background:var(--bg2)">
+        <div class="section-label" style="margin-bottom:10px">Exit Strategy</div>
+        <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);line-height:2">
+          Score ≥ 8 + bullish → <span style="color:var(--gold)">1 : 3.0 R/R</span><br/>
+          Score ≥ 6 + bullish → <span style="color:var(--gold)">1 : 2.5 R/R</span><br/>
+          Default → <span style="color:var(--gold)">1 : 2.3 R/R</span><br/>
+          Stop = Price ± (2.5 × ATR14)
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- OPTIMIZER -->
+<section id="optimizer">
+  <div class="optimizer-section">
+    <div class="section-label">Strategy Optimizer</div>
+    <h2 class="section-title">Bayesian Search Across<br/><em>26 Dimensions</em></h2>
+
+    <div class="opt-stats">
+      <div class="opt-stat"><div class="val">100</div><div class="lbl">Optuna Trials</div></div>
+      <div class="opt-stat"><div class="val">26</div><div class="lbl">Parameters</div></div>
+      <div class="opt-stat"><div class="val">7</div><div class="lbl">Stock Basket</div></div>
+      <div class="opt-stat"><div class="val">TPE</div><div class="lbl">Search Method</div></div>
+    </div>
+
+    <div class="optimizer-visual" style="margin-top:32px">
+      <div class="opt-flow" id="opt-flow">
+        <div class="opt-step">
+          <div class="opt-step-num">01</div>
+          <div class="opt-step-content">
+            <div class="opt-step-title">Random Exploration</div>
+            <div class="opt-step-desc">First 20 trials sample the parameter space randomly — <code>BUY_THRESHOLD</code>, <code>ATR_mult</code>, <code>RSI levels</code>, <code>ADX</code>, signal weights...</div>
+          </div>
+        </div>
+        <div class="opt-step">
+          <div class="opt-step-num">02</div>
+          <div class="opt-step-content">
+            <div class="opt-step-title">TPE Bayesian Search</div>
+            <div class="opt-step-desc">Trials 21–100 use Tree-structured Parzen Estimation. Each trial is smarter than the last, focusing on regions that maximize <code>Sharpe × WinRate / |MaxDD|</code>.</div>
+          </div>
+        </div>
+        <div class="opt-step">
+          <div class="opt-step-num">03</div>
+          <div class="opt-step-content">
+            <div class="opt-step-title">Auto-Apply</div>
+            <div class="opt-step-desc">Best parameters saved to <code>best_params.json</code> and applied directly to <code>signals.py</code> with a timestamped backup. Run with <code>--apply</code> flag.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="code-block" data-label="bash" style="margin-top:32px">
+      <pre><span class="cmd">python strategy_optimizer.py</span>          <span class="comment"># run 100 Bayesian trials</span>
+<span class="cmd">python strategy_optimizer.py --apply</span>  <span class="comment"># apply best_params.json → signals.py</span></pre>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- QUICKSTART -->
+<section id="quickstart">
+  <div class="quickstart-section">
+    <div class="section-label">Quick Start</div>
+    <h2 class="section-title">Up and Running in<br/><em>Four Commands</em></h2>
+
+    <div class="code-block" data-label="terminal">
+      <pre><span class="comment"># 1 · Clone the repository</span>
+<span class="cmd">git clone https://github.com/youcefbt-dz/MarketLab.git</span>
+<span class="cmd">cd MarketLab</span>
+
+<span class="comment"># 2 · Install dependencies</span>
+<span class="cmd">pip install -r requirements.txt</span>
+
+<span class="comment"># 3 · Build local data warehouse (250+ symbols)</span>
+<span class="cmd">python stock_warehouse.py</span>
+
+<span class="comment"># 4 · Run MarketLab</span>
+<span class="cmd">python main.py</span>
+
+<span class="comment"># Optional: Bayesian optimizer</span>
+<span class="cmd">python strategy_optimizer.py --apply</span></pre>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ROADMAP -->
+<section>
+  <div class="roadmap-section">
+    <div class="section-label">Roadmap</div>
+    <h2 class="section-title">What's <em>Next</em></h2>
+    <div class="roadmap-list">
+      <div class="roadmap-item"><div class="roadmap-dot done"></div><div class="roadmap-text done">ATR-based dynamic stop loss</div><div class="roadmap-version">v2.1</div></div>
+      <div class="roadmap-item"><div class="roadmap-dot done"></div><div class="roadmap-text done">Local data warehouse — 250+ symbols, ~1.8M rows</div><div class="roadmap-version">v2.8</div></div>
+      <div class="roadmap-item"><div class="roadmap-dot done"></div><div class="roadmap-text done">Parallel watchlist scanner</div><div class="roadmap-version">v2.8</div></div>
+      <div class="roadmap-item"><div class="roadmap-dot done"></div><div class="roadmap-text done">Black Box reliability logger</div><div class="roadmap-version">v2.4</div></div>
+      <div class="roadmap-item"><div class="roadmap-dot done"></div><div class="roadmap-text done">Bayesian strategy optimizer (Optuna · 26 params)</div><div class="roadmap-version">v3.0</div></div>
+      <div class="roadmap-item"><div class="roadmap-dot done"></div><div class="roadmap-text done">ADX filter + Bear market penalty</div><div class="roadmap-version">v3.1</div></div>
+      <div class="roadmap-item"><div class="roadmap-dot pending"></div><div class="roadmap-text">Trailing stop + partial exit</div><div class="roadmap-version">upcoming</div></div>
+      <div class="roadmap-item"><div class="roadmap-dot pending"></div><div class="roadmap-text">Swing trading module (shorter timeframes)</div><div class="roadmap-version">upcoming</div></div>
+      <div class="roadmap-item"><div class="roadmap-dot pending"></div><div class="roadmap-text">Crypto module (CCXT integration)</div><div class="roadmap-version">upcoming</div></div>
+      <div class="roadmap-item"><div class="roadmap-dot pending"></div><div class="roadmap-text">React dashboard for live signal monitoring</div><div class="roadmap-version">upcoming</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo"><strong>MarketLab</strong> · Quantitative Research</div>
+  <div class="footer-links">
+    <a href="https://github.com/youcefbt-dz/MarketLab" target="_blank">GitHub</a>
+    <a href="https://github.com/youcefbt-dz/MarketLab/blob/main/README.md" target="_blank">Docs</a>
+    <a href="https://github.com/youcefbt-dz/MarketLab/blob/main/LICENSE.txt" target="_blank">License</a>
+    <a href="https://github.com/youcefbt-dz/MarketLab/blob/main/CONTRIBUTING.md" target="_blank">Contributing</a>
+  </div>
+  <div class="footer-right">
+    Built for the quant community<br/>
+    Made in Algeria 🇩🇿 · Apache 2.0
+  </div>
+</footer>
+
+<script>
+// Nav scroll
+window.addEventListener('scroll', () => {
+  document.getElementById('nav').classList.toggle('scrolled', window.scrollY > 40);
+});
+
+// Ticker tape
+const tickers = [
+  {sym:'AAPL',val:'$213.40',chg:'+1.2%',up:true},
+  {sym:'MSFT',val:'$418.20',chg:'+0.8%',up:true},
+  {sym:'NVDA',val:'$875.50',chg:'+2.4%',up:true},
+  {sym:'TSLA',val:'$174.90',chg:'-1.1%',up:false},
+  {sym:'JPM', val:'$198.70',chg:'+0.5%',up:true},
+  {sym:'AMZN',val:'$184.20',chg:'+1.7%',up:true},
+  {sym:'XOM', val:'$118.40',chg:'-0.3%',up:false},
+  {sym:'GOOGL',val:'$171.80',chg:'+0.9%',up:true},
+  {sym:'META',val:'$508.30',chg:'+1.5%',up:true},
+  {sym:'AMD', val:'$163.70',chg:'-0.7%',up:false},
+  {sym:'SPY', val:'$527.40',chg:'+0.6%',up:true},
+  {sym:'QQQ', val:'$449.80',chg:'+0.9%',up:true},
+  {sym:'GLD', val:'$224.10',chg:'+0.2%',up:true},
+];
+const tape = document.getElementById('ticker');
+const items = [...tickers, ...tickers].map(t => {
+  const d = document.createElement('div');
+  d.className = 'ticker-item';
+  d.innerHTML = `<span class="sym">${t.sym}</span><span class="val">${t.val}</span><span class="chg ${t.up?'up':'dn'}">${t.chg}</span>`;
+  return d;
+});
+items.forEach(i => tape.appendChild(i));
+
+// Intersection Observer for animations
+const observe = (selector, cls='visible') => {
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach((e, i) => {
+      if (e.isIntersecting) {
+        setTimeout(() => e.target.classList.add(cls), i * 80);
+      }
+    });
+  }, { threshold: 0.1 });
+  document.querySelectorAll(selector).forEach(el => obs.observe(el));
+};
+
+observe('.pipe-node');
+observe('.feat-card');
+observe('.opt-step');
+</script>
+</body>
+</html>
