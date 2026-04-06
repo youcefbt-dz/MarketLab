@@ -5,7 +5,7 @@
 <br/>
 
 <p>
-  <a href="https://github.com/youcefbt-dz/MarketLab"><img src="https://img.shields.io/badge/version-3.0.0-0F172A?style=for-the-badge&labelColor=1E293B" alt="Version"/></a>
+  <a href="https://github.com/youcefbt-dz/MarketLab"><img src="https://img.shields.io/badge/version-3.1.0-0F172A?style=for-the-badge&labelColor=1E293B" alt="Version"/></a>
   <a href="https://python.org"><img src="https://img.shields.io/badge/python-3.10+-F59E0B?style=for-the-badge&logo=python&logoColor=white&labelColor=1E293B" alt="Python"/></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache_2.0-2563EB?style=for-the-badge&labelColor=1E293B" alt="License"/></a>
   <a href="https://github.com/youcefbt-dz/MarketLab/stargazers"><img src="https://img.shields.io/github/stars/youcefbt-dz/MarketLab?style=for-the-badge&color=F59E0B&labelColor=1E293B" alt="Stars"/></a>
@@ -13,7 +13,7 @@
 
 **Open-source quantitative research framework — signals, backtesting, sentiment, and Bayesian strategy optimization.**
 
-[Quick Start](#quick-start) · [Architecture](#architecture) · [Features](#features) · [Backtesting](#backtesting-engine) · [Optimizer](#strategy-optimizer) · [Contributing](CONTRIBUTING.md)
+[🌐 Website](https://youcefbt-dz.github.io/MarketLab/) · [Quick Start](#quick-start) · [Architecture](#architecture) · [Features](#features) · [Backtesting](#backtesting-engine) · [Optimizer](#strategy-optimizer) · [Contributing](CONTRIBUTING.md)
 
 </div>
 
@@ -332,6 +332,7 @@ MarketLab/
 ├── best_params.json         # Latest optimizer output
 │
 └── docs/
+    ├── index.html           # Landing page
     └── screenshots/
 ```
 
@@ -370,6 +371,7 @@ flask>=3.0.0           flask-cors>=4.0.0      optuna>=3.0.0
 - [x] Local data warehouse (250+ symbols)
 - [x] Parallel watchlist scanner
 - [x] Black Box reliability logger
+- [x] Landing page + GitHub Pages
 - [ ] Trailing stop + partial exit
 - [ ] Swing trading module (shorter timeframes)
 - [ ] Crypto module (CCXT integration)
@@ -381,11 +383,16 @@ flask>=3.0.0           flask-cors>=4.0.0      optuna>=3.0.0
 
 See [SYSTEM_RELEASE_HISTORY.md](./SYSTEM_RELEASE_HISTORY.md) for full version history.
 
-**v3.0.0** — Strategy Optimizer + Signal improvements
-- Added `strategy_optimizer.py` — 100-trial Bayesian optimization via Optuna
-- Added `MIN_ADX_ENTRY=18` filter — blocks entry in choppy markets
+**v3.1.0** — Signal Filters + CLI Refactor
+- Refactored `main.py` into 5-mode interactive CLI
+- Added `MIN_ADX_ENTRY = 18` filter — blocks entry in choppy markets
 - Added bear market deep penalty (−2 when price 15%+ below MA200)
-- ATR multiplier 1.5 → 2.5 for wider, more realistic stop losses
+- ATR stop loss multiplier: 1.5 → 2.5 for more realistic exits
+- Parallel watchlist scanner improvements
+- Launched [project landing page](https://youcefbt-dz.github.io/MarketLab/)
+
+**v3.0.0** — Strategy Optimizer
+- Added `strategy_optimizer.py` — 100-trial Bayesian optimization via Optuna
 - Upgraded `main.py` Mode 4: ML Predictor → Strategy Optimizer
 
 **v2.8.0** — Watchlist Scanner + Warehouse  
