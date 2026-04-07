@@ -32,6 +32,17 @@ The project is designed to be readable, extensible, and portfolio-ready — with
 > **Disclaimer:** MarketLab is built for educational and research purposes only. It does not constitute financial advice.
 
 ---
+---
+
+## The Command Center
+
+The system features a streamlined, interactive CLI designed for high-efficiency quantitative research.
+
+<div align="center">
+  <img src="docs/screenshots/terminal_UI.png" width="900" style="border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);"/>
+</div>
+
+---
 
 ### Screenshots
 
