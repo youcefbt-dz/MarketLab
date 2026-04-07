@@ -1,17 +1,16 @@
 """
-main.py — MarketLab v3.0
+main.py — MarketLab v3.1
 Entry point for all analysis modes.
 
 Modes:
-    [1] Portfolio Analysis  — signals + sentiment + PDF report
-    [2] Backtesting         — historical simulation + logger
-    [3] Watchlist Scanner   — parallel scan of 250+ tickers
-    [4] ML Predictor        — train & evaluate quality predictor
-    [5] Warehouse Manager   — update / inspect local data
+    [1] Portfolio Analysis   — signals + sentiment + charts + PDF report
+    [2] Backtesting          — historical simulation + walk-forward + logger
+    [3] Watchlist Scanner    — parallel scan of 250+ tickers + ranked output
+    [4] Strategy Optimizer   — auto-tune signal parameters + Bayesian search
+    [5] Warehouse Manager    — update + status + inspect local data
 """
 from __future__ import annotations
 
-import json
 import warnings
 from datetime import datetime
 from pathlib import Path
@@ -22,6 +21,23 @@ import pandas as pd
 import pandas_ta as ta
 from scipy import stats
 from thefuzz import process
+
+# ── Rich imports ──────────────────────────────────────────────────────────────
+try:
+    import pyfiglet
+    _HAS_FIGLET = True
+except ImportError:
+    _HAS_FIGLET = False
+
+from rich.console import Console
+from rich.columns import Columns
+from rich.panel   import Panel
+from rich.table   import Table
+from rich.text    import Text
+from rich.rule    import Rule
+from rich.align import Align
+from rich import box
+from rich import print as rprint
 
 from report_generator  import generate_pdf_report
 from sentiment         import analyze_sentiment, print_sentiment
@@ -35,9 +51,8 @@ plt.rcParams["lines.linewidth"] = 1.5
 
 # ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
-VERSION  = "3.0"
-BAR      = "═" * 62
-THIN_BAR = "─" * 62
+VERSION  = "3.1"
+console  = Console()
 
 SIGNAL_ICONS = {
     "STRONG BUY" : "🟢",
@@ -51,28 +66,83 @@ MODES = {
     "1": ("Portfolio Analysis",  "signals · sentiment · charts · PDF report"),
     "2": ("Backtesting",         "historical simulation · walk-forward · logger"),
     "3": ("Watchlist Scanner",   "parallel scan of 250+ tickers · ranked output"),
-    "4": ("ML Predictor",        "train · evaluate · feature importance"),
+    "4": ("Strategy Optimizer",  "auto-tune signal parameters · Bayesian search"),
     "5": ("Warehouse Manager",   "update · status · inspect local data"),
 }
 
-
 # ─── UI HELPERS ───────────────────────────────────────────────────────────────
 
-def _banner() -> None:
+def _banner(n_companies: int) -> None:
     now = datetime.now().strftime("%Y-%m-%d  %H:%M")
-    print(f"\n{BAR}")
-    print(f"  MarketLab  v{VERSION}  ·  Quantitative Finance Analytics")
-    print(f"  {now}")
-    print(BAR)
+
+    # ── ASCII logo ─────────────────────────────────────────
+    if _HAS_FIGLET:
+        raw = pyfiglet.figlet_format("MarketLab", font="big").rstrip()
+    else:
+        raw = (
+            "  __  ___           __        __      __     \n"
+            " /  |/  /___ ______/ /_____ _/ /___ _/ /_    \n"
+            "/ /|_/ / __ `/ ___/ //_/ _ `/ / __ `/ __ \\   \n"
+            "/ /  / / /_/ / /  / ,< /  __/ / /_/ / /_/ /  \n"
+            "/_/  /_/\\__,_/_/  /_/|_|\\___/_/\\__,_/_.___/  "
+        )
+
+    logo_text = Text(raw, style="bold green")
+
+    console.print(Align.center(logo_text), end="")
+    console.print()
+
+#    console.print(
+#        Align.center(
+#            Text(
+#                f"v{VERSION}",
+#                style="dim"
+#            )
+#        )
+#    )
+
+    console.rule(style="green")
+
+    console.print(
+        Align.center(
+            f"[dim]Quantitative Finance Analytics · {n_companies} Companies · {now}[/dim]"
+        )
+    )
+
+    console.print()
+
+    # ── Two info panels side by side ──────────────────────────────────────────
+    sys_table = Table.grid(padding=(0, 2))
+    sys_table.add_column(style="dim")
+    sys_table.add_column()
+    sys_table.add_row("warehouse",  f"[bold green]{n_companies}+ symbols  ✓[/]")
+    sys_table.add_row("SPY regime", "[bold green]available[/]")
+    sys_table.add_row("optimizer",  "[bold blue]best_params.json[/]")
+    sys_table.add_row("logger",     "[dim]backtest_history.json[/]")
+
+    mode_table = Table.grid(padding=(0, 2))
+    mode_table.add_column(style="bold green")
+    mode_table.add_column(style="white")
+    mode_table.add_column(style="dim")
+    for key, (name, desc) in MODES.items():
+        mode_table.add_row(f"[{key}]", name, desc)
+
+    sys_panel  = Panel(sys_table,  title="[dim]system[/dim]",  border_style="dim green", padding=(0, 1))
+    mode_panel = Panel(mode_table, title="[dim]modes[/dim]",   border_style="dim green", padding=(0, 1))
+
+    console.print(Columns([sys_panel, mode_panel], equal=True))
+    console.print()
 
 
 def _section(title: str) -> None:
-    print(f"\n{THIN_BAR}\n  {title}\n{THIN_BAR}")
+    console.print()
+    console.rule(f"[bold white]{title}[/]", style="dim green")
+    console.print()
 
 
-def _ok(msg: str)   -> None: print(f"  ✔  {msg}")
-def _warn(msg: str) -> None: print(f"  ⚠  {msg}")
-def _err(msg: str)  -> None: print(f"  ✗  {msg}")
+def _ok(msg: str)   -> None: console.print(f"  [bold green]✔[/]  {msg}")
+def _warn(msg: str) -> None: console.print(f"  [bold yellow]⚠[/]  {msg}")
+def _err(msg: str)  -> None: console.print(f"  [bold red]✗[/]  {msg}")
 
 
 def _prompt_int(prompt: str, lo: int, hi: int) -> int:
@@ -92,11 +162,11 @@ def _prompt_choice(prompt: str, valid: set[str]) -> str:
 
 
 def _mode_menu() -> str:
-    print()
-    for key, (name, desc) in MODES.items():
-        print(f"    [{key}]  {name:<22}  {desc}")
-    print()
-    return _prompt_choice("Select mode", set(MODES))
+    console.print(
+        "[bold green]→[/]  [dim]select mode[/dim]  [dim green][1–5]:[/dim green] ",
+        end="",
+    )
+    return _prompt_choice("", set(MODES))
 
 
 # ─── TICKER HELPERS ───────────────────────────────────────────────────────────
@@ -121,6 +191,7 @@ def _validate_ticker(ticker: str) -> bool:
         load_local(ticker)
         return True
     except FileNotFoundError:
+        _warn(f"{ticker} not in warehouse — run Mode [5] to download it.")
         return False
 
 
@@ -238,27 +309,42 @@ def _calculate_metrics(returns: pd.Series, beta: float, annual_rf: float) -> dic
 def _print_stock_info(ticker: str, info: dict) -> None:
     _section(f"{ticker}  ·  Basic Info")
     cap = f"${info['marketCap']:,}" if info["marketCap"] != "N/A" else "N/A"
-    print(f"    Price         : ${info['currentPrice']}")
-    print(f"    Market Cap    : {cap}")
-    print(f"    52W High      : ${info['fiftyTwoWeekHigh']}")
-    print(f"    52W Low       : ${info['fiftyTwoWeekLow']}")
+
+    t = Table.grid(padding=(0, 3))
+    t.add_column(style="dim", min_width=16)
+    t.add_column(style="white")
+    t.add_row("Price",      f"[bold green]${info['currentPrice']}[/]")
+    t.add_row("Market Cap", cap)
+    t.add_row("52W High",   f"${info['fiftyTwoWeekHigh']}")
+    t.add_row("52W Low",    f"${info['fiftyTwoWeekLow']}")
+    console.print(Panel(t, border_style="dim green", padding=(0, 2)))
 
 
 def _print_indicators(ticker: str, df: pd.DataFrame) -> None:
     _section(f"{ticker}  ·  Latest Indicators")
-    print(f"    MA50 / MA200  : {df['MA50'].iloc[-1]:.2f}  /  {df['MA200'].iloc[-1]:.2f}")
-    print(f"    EMA20         : {df['EMA20'].iloc[-1]:.2f}")
-    print(f"    RSI           : {df['RSI'].iloc[-1]:.2f}")
-    print(f"    MACD          : {df['MACD'].iloc[-1]:.4f}  |  Signal: {df['Signal'].iloc[-1]:.4f}")
-    print(f"    Stoch %K/%D   : {df['%K'].iloc[-1]:.2f}  /  {df['%D'].iloc[-1]:.2f}")
-    print(f"    Beta          : {df.attrs['beta']:.3f}  |  R²: {df.attrs['r_squared']:.4f}")
+
+    t = Table.grid(padding=(0, 3))
+    t.add_column(style="dim", min_width=16)
+    t.add_column(style="white")
+    t.add_row("MA50 / MA200", f"{df['MA50'].iloc[-1]:.2f}  /  {df['MA200'].iloc[-1]:.2f}")
+    t.add_row("EMA20",        f"{df['EMA20'].iloc[-1]:.2f}")
+    t.add_row("RSI",          f"{df['RSI'].iloc[-1]:.2f}")
+    t.add_row("MACD",         f"{df['MACD'].iloc[-1]:.4f}  |  Signal: {df['Signal'].iloc[-1]:.4f}")
+    t.add_row("Stoch %K/%D",  f"{df['%K'].iloc[-1]:.2f}  /  {df['%D'].iloc[-1]:.2f}")
+    t.add_row("Beta / R²",    f"{df.attrs['beta']:.3f}  /  {df.attrs['r_squared']:.4f}")
+    console.print(Panel(t, border_style="dim green", padding=(0, 2)))
 
 
 def _print_metrics(ticker: str, metrics: dict) -> None:
     _section(f"{ticker}  ·  Financial Metrics")
-    print(f"    Sharpe Ratio  : {metrics['Sharpe Annualized']:.4f}")
-    print(f"    Ann. Return   : {metrics['Annualized Return'] * 100:.2f}%")
-    print(f"    Beta          : {metrics['Beta']:.4f}")
+
+    t = Table.grid(padding=(0, 3))
+    t.add_column(style="dim", min_width=16)
+    t.add_column(style="white")
+    t.add_row("Sharpe Ratio", f"{metrics['Sharpe Annualized']:.4f}")
+    t.add_row("Ann. Return",  f"{metrics['Annualized Return'] * 100:.2f}%")
+    t.add_row("Beta",         f"{metrics['Beta']:.4f}")
+    console.print(Panel(t, border_style="dim green", padding=(0, 2)))
 
 
 # ─── CHARTS ───────────────────────────────────────────────────────────────────
@@ -312,9 +398,9 @@ def _analyze_seasonality(ticker: str, df: pd.DataFrame) -> str | None:
         monthly_ret      = monthly.groupby("Month")["Stock_Return"].mean() * 100
 
         _section(f"{ticker}  ·  Monthly Seasonality")
-        print(monthly_ret.round(3).to_string())
-        print(f"\n    Best month  : {monthly_ret.idxmax()}")
-        print(f"    Worst month : {monthly_ret.idxmin()}")
+        console.print(monthly_ret.round(3).to_string())
+        console.print(f"\n    [dim]Best month :[/dim]  [bold green]{monthly_ret.idxmax()}[/]")
+        console.print(f"    [dim]Worst month:[/dim]  [bold red]{monthly_ret.idxmin()}[/]")
 
         fig, ax = plt.subplots(figsize=(10, 5))
         monthly_ret.plot(kind="bar", ax=ax, color="teal", edgecolor="black")
@@ -340,7 +426,7 @@ def _calculate_correlation(all_data: dict) -> None:
         [d["Stock_Return"].rename(t) for t, d in valid.items()], axis=1
     ).corr()
     _section("Portfolio  ·  Correlation Matrix")
-    print(corr.round(3).to_string())
+    console.print(corr.round(3).to_string())
     try:
         fig, ax = plt.subplots(figsize=(8, 6))
         im = ax.imshow(corr, cmap="RdYlGn", vmin=-1, vmax=1)
@@ -399,17 +485,30 @@ def _compute_final_signal(
 
 def _print_signal(ticker: str, res: dict) -> None:
     icon   = SIGNAL_ICONS.get(res["signal"], "⬜")
-    change = (f"  (was {res['original_signal']} before sentiment)"
+    change = (f"  [dim](was {res['original_signal']} before sentiment)[/dim]"
               if res["signal"] != res["original_signal"] else "")
-    print(f"\n  {icon}  {ticker:<6}  →  {res['signal']}{change}")
-    print(f"       Score : {res['base_score']} → {res['adjusted_score']}  (after sentiment)")
+
+    signal_color = {
+        "STRONG BUY": "bold green", "BUY": "green",
+        "HOLD": "yellow",
+        "SELL": "red", "STRONG SELL": "bold red",
+    }.get(res["signal"], "white")
+
+    console.print(
+        f"\n  {icon}  [bold]{ticker:<6}[/]  →  "
+        f"[{signal_color}]{res['signal']}[/]{change}"
+    )
+    console.print(
+        f"       [dim]Score :[/dim]  {res['base_score']} → "
+        f"[bold]{res['adjusted_score']}[/]  [dim](after sentiment)[/dim]"
+    )
     if res["signal"] == "HOLD":
         if res["sent_score"] >= 2:
             _warn("Sentiment bullish — watch for technical confirmation.")
         elif res["sent_score"] <= -2:
             _warn("Sentiment bearish — defensive stance advised.")
     for reason in res["reasons"]:
-        print(f"       · {reason}")
+        console.print(f"       [dim]·[/dim] {reason}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -422,8 +521,8 @@ def _run_analysis(name_to_ticker: dict) -> None:
     num   = _prompt_int("Number of stocks to analyze", 1, 20)
     years = _prompt_int("Years of historical data",    1, 10)
 
-    print(f"\n  Risk-Free Rate  (current 10Y US Treasury ≈ 4.2%)")
-    print(f"  Press Enter for 4.0% default, or type a value (e.g. 4.2).")
+    console.print(f"\n  [dim]Risk-Free Rate  (current 10Y US Treasury ≈ 4.2%)[/dim]")
+    console.print(f"  [dim]Press Enter for 4.0% default, or type a value (e.g. 4.2).[/dim]")
     raw_rf = input("  Annual RF rate [%]: ").strip()
     try:
         annual_rf = max(0.0, min(float(raw_rf) / 100 if raw_rf else 0.04, 0.20))
@@ -437,7 +536,7 @@ def _run_analysis(name_to_ticker: dict) -> None:
     all_data, stock_info, all_metrics, all_sentiment = {}, {}, {}, {}
 
     for ticker in tickers:
-        print(f"\n{BAR}\n  Analyzing  {ticker}\n{BAR}")
+        console.rule(f"[bold green]Analyzing  {ticker}[/]", style="green")
 
         info, history      = _fetch_ticker_data(ticker, years)
         stock_info[ticker] = info
@@ -488,14 +587,15 @@ def _run_analysis(name_to_ticker: dict) -> None:
         _print_signal(ticker, res)
 
     # PDF Report
-    print(f"\n{THIN_BAR}")
-    print("  Generating PDF report…")
+    console.print()
+    console.rule(style="dim green")
+    console.print("  [dim]Generating PDF report…[/dim]")
     generate_pdf_report(
         all_data, stock_info, all_metrics,
         tickers, all_sentiment, seasonality_charts,
     )
     _ok("Report saved successfully.")
-    print(THIN_BAR)
+    console.rule(style="dim green")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -516,7 +616,7 @@ def _run_scanner(name_to_ticker: dict) -> None:
     _section("Mode 3 — Watchlist Scanner")
     from watchlist_scanner import scan_watchlist
 
-    print("  Scan options (press Enter to use defaults):")
+    console.print("  [dim]Scan options (press Enter to use defaults):[/dim]")
 
     raw_top = input("  Top N results     [default 20]: ").strip()
     top_n   = int(raw_top) if raw_top.isdigit() else 20
@@ -544,43 +644,58 @@ def _run_scanner(name_to_ticker: dict) -> None:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# MODE 4 — ML Predictor
+# MODE 4 — Strategy Optimizer
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _run_ml_predictor() -> None:
-    _section("Mode 4 — ML Predictor")
-    from ml_predictor import BacktestPredictor
+def _run_optimizer() -> None:
+    _section("Mode 4 — Strategy Optimizer")
+    from strategy_optimizer import run_optimization, apply_best_params
+    import os
 
-    print("  Options:")
-    print("    [1]  Full report   (train + evaluate + feature importance)")
-    print("    [2]  Train only")
-    print("    [3]  Evaluate only (uses existing trained model)")
-    print("    [4]  Feature importance")
-    print()
-    sub = _prompt_choice("Select", {"1", "2", "3", "4"})
-
-    history_file = input(
-        f"  History file [default: backtest_history.json]: "
-    ).strip() or "backtest_history.json"
-
-    if not Path(history_file).exists():
-        _err(f"'{history_file}' not found. Run mode [2] first to generate backtest data.")
-        return
-
-    predictor = BacktestPredictor(history_file)
+    console.print("  [dim]Options:[/dim]")
+    console.print("    [bold green][1][/]  Run optimization   [dim]— find best signal parameters (≈10 min)[/dim]")
+    console.print("    [bold green][2][/]  Apply best params  [dim]— update signals.py from best_params.json[/dim]")
+    console.print("    [bold green][3][/]  Show best params   [dim]— display current best_params.json[/dim]")
+    console.print()
+    sub = _prompt_choice("Select", {"1", "2", "3"})
 
     if sub == "1":
-        predictor.full_report()
+        _warn("This will run 100 Bayesian trials across 7 stocks.")
+        _warn("Do not close this window — results auto-save to best_params.json")
+        console.print()
+        confirm = input("  Continue? (y/n): ").strip().lower()
+        if confirm in ("y", "yes"):
+            run_optimization()
+        else:
+            console.print("  [dim]Cancelled.[/dim]")
+
     elif sub == "2":
-        predictor.train(verbose=True)
+        if not Path("best_params.json").exists():
+            _err("best_params.json not found. Run option [1] first.")
+            return
+        apply_best_params()
+        _ok("signals.py updated. Run backtest to verify improvement.")
+
     elif sub == "3":
-        predictor.train(verbose=False)
-        predictor.evaluate()
-    elif sub == "4":
-        raw_n  = input("  Top N features [default 10]: ").strip()
-        top_n  = int(raw_n) if raw_n.isdigit() else 10
-        predictor.train(verbose=False)
-        predictor.feature_importance(top_n=top_n)
+        if not Path("best_params.json").exists():
+            _err("best_params.json not found. Run optimization first.")
+            return
+        import json
+        with open("best_params.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        t = Table.grid(padding=(0, 3))
+        t.add_column(style="dim", min_width=14)
+        t.add_column(style="white")
+        t.add_row("Timestamp",  data.get("timestamp", "N/A"))
+        t.add_row("Best Score", f"[bold green]{data.get('best_score', 'N/A')}[/]")
+        t.add_row("Trial",      f"#{data.get('best_trial', 'N/A')} / {data.get('n_trials', 'N/A')}")
+        t.add_row("Basket",     ", ".join(data.get("basket", [])))
+        console.print(Panel(t, title="[dim]best_params.json[/dim]", border_style="dim green", padding=(0, 2)))
+
+        console.print("  [dim]Parameters:[/dim]")
+        for k, v in data.get("params", {}).items():
+            console.print(f"    [dim]{k:<28}[/dim] = [bold green]{v}[/]")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -591,24 +706,24 @@ def _run_warehouse() -> None:
     _section("Mode 5 — Warehouse Manager")
     from stock_warehouse import weekly_update
 
-    print("  Options:")
-    print("    [1]  Status       — show all stored symbols")
-    print("    [2]  Update       — download / refresh all symbols")
-    print("    [3]  Inspect      — preview rows for a specific ticker")
-    print()
+    console.print("  [dim]Options:[/dim]")
+    console.print("    [bold green][1][/]  Status   [dim]— show all stored symbols[/dim]")
+    console.print("    [bold green][2][/]  Update   [dim]— download / refresh all symbols[/dim]")
+    console.print("    [bold green][3][/]  Inspect  [dim]— preview rows for a specific ticker[/dim]")
+    console.print()
     sub = _prompt_choice("Select", {"1", "2", "3"})
 
     if sub == "1":
         warehouse_status()
 
     elif sub == "2":
-        print()
+        console.print()
         _warn("This will download data for all symbols in companies.json.")
         confirm = input("  Continue? (y/n): ").strip().lower()
         if confirm in ("y", "yes"):
             weekly_update()
         else:
-            print("  Cancelled.")
+            console.print("  [dim]Cancelled.[/dim]")
 
     elif sub == "3":
         ticker = input("  Ticker symbol: ").strip().upper()
@@ -617,9 +732,9 @@ def _run_warehouse() -> None:
             raw_n = input("  Rows to preview [default 10]: ").strip()
             n     = int(raw_n) if raw_n.isdigit() else 10
             _section(f"{ticker}  ·  Last {n} rows")
-            print(df.tail(n).to_string(index=False))
-            print(f"\n  Total rows: {len(df):,}")
-            print(f"  Date range: {df['Date'].iloc[0]}  →  {df['Date'].iloc[-1]}")
+            console.print(df.tail(n).to_string(index=False))
+            console.print(f"\n  [dim]Total rows:[/dim]  [bold]{len(df):,}[/]")
+            console.print(f"  [dim]Date range:[/dim]  {df['Date'].iloc[0]}  →  {df['Date'].iloc[-1]}")
         except FileNotFoundError:
             _err(f"'{ticker}' not found in warehouse. Run update first.")
 
@@ -629,11 +744,13 @@ def _run_warehouse() -> None:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def main() -> None:
-    _banner()
-    warehouse_status()
-
+    # load companies first so we can pass count to banner
     name_to_ticker = load_companies()
-    _ok(f"Loaded {len(name_to_ticker):,} companies from companies.json")
+    n_companies    = len(name_to_ticker)
+
+    _banner(n_companies)
+    #warehouse_status()
+    #_ok(f"Loaded {n_companies:,} companies from companies.json")
 
     while True:
         mode = _mode_menu()
@@ -641,14 +758,19 @@ def main() -> None:
         if   mode == "1": _run_analysis(name_to_ticker)
         elif mode == "2": _run_backtest()
         elif mode == "3": _run_scanner(name_to_ticker)
-        elif mode == "4": _run_ml_predictor()
+        elif mode == "4": _run_optimizer()
         elif mode == "5": _run_warehouse()
 
-        print(f"\n{THIN_BAR}")
+        console.print()
+        console.rule(style="dim green")
         again = input("  Return to main menu? (y/n): ").strip().lower()
         if again not in ("y", "yes"):
-            print(f"\n  MarketLab session ended.  {datetime.now().strftime('%H:%M:%S')}")
-            print(f"{BAR}\n")
+            console.print(
+                f"\n  [dim]MarketLab session ended.  "
+                f"{datetime.now().strftime('%H:%M:%S')}[/dim]"
+            )
+            console.rule(style="dim green")
+            console.print()
             break
 
 
