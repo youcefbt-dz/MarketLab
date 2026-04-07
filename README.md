@@ -44,27 +44,28 @@ The system features a streamlined, interactive CLI designed for high-efficiency 
 
 ---
 
-### Screenshots
+## Strategic Intelligence Report
 
 <div align="center">
-  <table>
-    <tr>
-      <td align="center">
-        <strong>Executive Summary Report</strong><br/>
-        <img src="docs/screenshots/screenshot_report.png" width="300" style="border-radius: 8px; margin: 8px;">
+  <table style="border-collapse: collapse; border: none; width: 100%;">
+    <tr style="border: none;">
+      <td align="center" style="border: none; width: 33.33%; padding: 10px; vertical-align: top;">
+        <p><strong>Strategic Intelligence</strong></p>
+        <img src="docs/screenshots/screenshot_report.png" width="100%" style="border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); border: 1px solid #30363d;">
       </td>
-      <td align="center">
-        <strong>News Sentiment Analysis</strong><br/>
-        <img src="docs/screenshots/screenshot_sentiment.png" width="300" style="border-radius: 8px; margin: 8px;">
+      <td align="center" style="border: none; width: 33.33%; padding: 10px; vertical-align: top;">
+        <p><strong>Sentiment Analysis</strong></p>
+        <img src="docs/screenshots/screenshot_sentiment.png" width="100%" style="border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); border: 1px solid #30363d;">
       </td>
-    </tr>
-    <tr>
-      <td align="center" colspan="2">
-        <strong>Technical Charts</strong><br/>
-        <img src="docs/screenshots/screenshot_charts.png" width="620" style="border-radius: 8px; margin: 8px;">
+      <td align="center" style="border: none; width: 33.33%; padding: 10px; vertical-align: top;">
+        <p><strong>Technical Charts</strong></p>
+        <img src="docs/screenshots/screenshot_charts.png" width="100%" style="border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); border: 1px solid #30363d;">
       </td>
     </tr>
   </table>
+  <p>
+    <sub><i>Visual outputs from MarketLab v3.1.0 — Processing localized market intelligence.</i></sub>
+  </p>
 </div>
 
 ---
@@ -429,5 +430,5 @@ Licensed under the **Apache License 2.0** — see [LICENSE](LICENSE) for details
 ---
 
 <div align="center">
-<sub>Built for the quant community · Made in Algeria 🇩🇿</sub>
+<sub>Built for the quant community</sub>
 </div>
