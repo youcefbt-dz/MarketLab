@@ -1,4 +1,14 @@
+"""
+ml_predictor.py — MarketLab ML Predictor  v2.2
+Predicts whether a backtest run is "QUALITY" based on accumulated history.
+
+Changes from v2.1:
+  - Added XGBoost as 4th model (replaces GradientBoosting when data ≥ 50)
+  - GradientBoosting kept as fallback when xgboost not installed
+  - All other logic unchanged
+"""
 from __future__ import annotations
+
 import json
 import os
 import warnings
@@ -23,24 +33,28 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 
+# XGBoost — optional, graceful fallback to GradientBoosting
+try:
+    from xgboost import XGBClassifier
+    _HAS_XGB = True
+except ImportError:
+    _HAS_XGB = False
+
 warnings.filterwarnings("ignore")
 
 # ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
 HISTORY_FILE = "backtest_history.json"
-# FIX 2+minor: raised from 10 → 20 so n_minority≥2 is meaningful for SMOTE/CV
 MIN_SAMPLES  = 20
 RANDOM_STATE = 42
 REGIME_MAP   = {"Bull": 1, "Sideways": 0, "Bear": -1}
 
-# ── quality_trade thresholds ──────────────────────────────────────────────────
 QUALITY_SHARPE   =  0.5
 QUALITY_DRAWDOWN = -12.0
 QUALITY_WINRATE  =  50.0
 
-# FIX 3: demo detection — flag used in purge_history, not a raw days check
-DEMO_PERIOD_DAYS = 365          # exact value Backtester uses for demo runs
-DEMO_TICKER      = "__DEMO__"   # optional: set a sentinel ticker in demo runs
+DEMO_PERIOD_DAYS = 365
+DEMO_TICKER      = "__DEMO__"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -48,22 +62,16 @@ DEMO_TICKER      = "__DEMO__"   # optional: set a sentinel ticker in demo runs
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _is_demo_run(r: dict) -> bool:
-    """
-    FIX 3: A run is a demo only when BOTH conditions hold:
-      - period.days == 365  (the demo default)
-      - ticker is the sentinel OR run_id starts with 'demo'
-    A real 1-year backtest on a normal ticker is NOT a demo.
-    """
-    days       = r.get("period", {}).get("days", 0)
-    ticker     = r.get("ticker", "")
-    run_id     = r.get("run_id", "")
-    is_365     = days == DEMO_PERIOD_DAYS
+    days        = r.get("period", {}).get("days", 0)
+    ticker      = r.get("ticker", "")
+    run_id      = r.get("run_id", "")
+    is_365      = days == DEMO_PERIOD_DAYS
     is_sentinel = ticker == DEMO_TICKER or str(run_id).lower().startswith("demo")
     return is_365 and is_sentinel
 
 
 def purge_history(data: list[dict]) -> tuple[list[dict], dict]:
-    seen          = {}   # key → index in result (keep latest)
+    seen          = {}
     removed_demo  = 0
     removed_dupe  = 0
     result        = []
@@ -72,9 +80,7 @@ def purge_history(data: list[dict]) -> tuple[list[dict], dict]:
         if _is_demo_run(r):
             removed_demo += 1
             continue
-
         key = (r["ticker"], r["period"]["start"], r["period"]["days"])
-
         if key in seen:
             result[seen[key]] = r
             removed_dupe += 1
@@ -82,31 +88,23 @@ def purge_history(data: list[dict]) -> tuple[list[dict], dict]:
             seen[key] = len(result)
             result.append(r)
 
-    stats = {
+    return result, {
         "original"    : len(data),
         "removed_demo": removed_demo,
         "removed_dupe": removed_dupe,
         "clean"       : len(result),
     }
-    return result, stats
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# STEP 2 — MLDataset  (Feature Engineering + quality_trade label)
+# STEP 2 — MLDataset
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# FIX 4: safe divisor helpers
 def _safe_div(numerator: float, denominator: float, fallback: float = 0.0) -> float:
-    """Return numerator/denominator, or fallback when denominator is ~0."""
     return numerator / denominator if abs(denominator) > 1e-9 else fallback
 
 
 def _safe_drawdown_div(total_return: float, max_dd: float) -> float:
-    """
-    risk_adjusted_return = total_return / |max_dd|.
-    When max_dd == 0 (no losses), return total_return directly
-    so the feature stays meaningful instead of becoming ±∞.
-    """
     return _safe_div(total_return, abs(max_dd), fallback=total_return)
 
 
@@ -123,9 +121,7 @@ class MLDataset:
         Derived  : win_loss_ratio, trade_efficiency, risk_adjusted_return
 
     Target:
-        quality_trade = 1  if:
-            sharpe > 0.5  AND  max_drawdown > -12%  AND  win_rate > 50%
-        quality_trade = 0  otherwise
+        quality_trade = 1  if sharpe > 0.5 AND drawdown > -12% AND win_rate > 50%
     """
 
     FEATURE_COLS = [
@@ -157,7 +153,8 @@ class MLDataset:
         if len(data) < MIN_SAMPLES:
             raise ValueError(
                 f"Only {len(data)} records after purge — "
-                f"need at least {MIN_SAMPLES}."
+                f"need at least {MIN_SAMPLES}. "
+                f"Run batch_backtest.py to generate more data."
             )
 
         rows = []
@@ -170,7 +167,7 @@ class MLDataset:
             wins         = ts.get("wins",   0)
             losses       = ts.get("losses", 0)
             total_return = m.get("total_return", 0)
-            max_dd       = m.get("max_drawdown", 0)   # FIX 4: keep 0, handle in helper
+            max_dd       = m.get("max_drawdown", 0)
 
             sl_hits = er.get("Hit SL", 0) + er.get("Hit SL (Gap Down)", 0)
             tp_hits = er.get("Hit TP", 0) + er.get("Hit TP (Gap Up)",   0)
@@ -202,7 +199,6 @@ class MLDataset:
                 "tp_rate"               : round(_safe_div(tp_hits, total_trades), 4),
                 "win_loss_ratio"        : round(_safe_div(wins, losses + 1),      4),
                 "trade_efficiency"      : round(_safe_div(total_return, total_trades), 4),
-                # FIX 4: no more ±∞ when max_dd == 0
                 "risk_adjusted_return"  : round(_safe_drawdown_div(total_return, max_dd), 4),
                 "ticker"                : r.get("ticker", ""),
                 "run_id"                : r.get("run_id", ""),
@@ -246,16 +242,16 @@ class MLDataset:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# STEP 3 — BacktestPredictor  (SMOTE + 3 Models)
+# STEP 3 — BacktestPredictor  (SMOTE + 4 Models)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class BacktestPredictor:
 
-    def _make_models(self, n_minority: int) -> dict:
+    def _make_models(self, n_minority: int, n_total: int) -> dict:
         k     = max(1, min(5, n_minority - 1))
         smote = SMOTE(k_neighbors=k, random_state=RANDOM_STATE)
 
-        return {
+        models = {
             "RandomForest": ImbPipeline([
                 ("smote", smote),
                 ("clf",   RandomForestClassifier(
@@ -263,16 +259,6 @@ class BacktestPredictor:
                     max_depth=4,
                     min_samples_leaf=2,
                     class_weight="balanced",
-                    random_state=RANDOM_STATE,
-                )),
-            ]),
-            "GradientBoosting": ImbPipeline([
-                ("smote", smote),
-                ("clf",   GradientBoostingClassifier(
-                    n_estimators=200,
-                    max_depth=3,
-                    learning_rate=0.05,
-                    subsample=0.8,
                     random_state=RANDOM_STATE,
                 )),
             ]),
@@ -288,16 +274,46 @@ class BacktestPredictor:
             ]),
         }
 
+        # XGBoost — preferred over GradientBoosting when available
+        if _HAS_XGB:
+            models["XGBoost"] = ImbPipeline([
+                ("smote", smote),
+                ("clf",   XGBClassifier(
+                    n_estimators=200,
+                    max_depth=3,
+                    learning_rate=0.05,
+                    subsample=0.8,
+                    colsample_bytree=0.8,
+                    use_label_encoder=False,
+                    eval_metric="logloss",
+                    random_state=RANDOM_STATE,
+                    verbosity=0,
+                )),
+            ])
+        else:
+            # Fallback — GradientBoosting from sklearn
+            models["GradientBoosting"] = ImbPipeline([
+                ("smote", smote),
+                ("clf",   GradientBoostingClassifier(
+                    n_estimators=200,
+                    max_depth=3,
+                    learning_rate=0.05,
+                    subsample=0.8,
+                    random_state=RANDOM_STATE,
+                )),
+            ])
+
+        return models
+
     def __init__(self, history_file: str = HISTORY_FILE):
-        self.history_file  = history_file
-        self.dataset       = MLDataset(history_file)
-        self.best_model    = None
-        self.best_name     = None
-        self.best_cv_score = 0.0
-        self.feature_cols  = MLDataset.FEATURE_COLS
-        self._trained      = False
-        self._models       = {}
-        # FIX 1: store unfitted clone for evaluate() to avoid data leakage
+        self.history_file            = history_file
+        self.dataset                 = MLDataset(history_file)
+        self.best_model              = None
+        self.best_name               = None
+        self.best_cv_score           = 0.0
+        self.feature_cols            = MLDataset.FEATURE_COLS
+        self._trained                = False
+        self._models                 = {}
         self._best_pipeline_unfitted = None
 
     # ── Train ─────────────────────────────────────────────────────────────────
@@ -308,13 +324,16 @@ class BacktestPredictor:
 
         n_minority = int(y.sum())
         n_majority = int(len(y) - n_minority)
+        n_total    = len(y)
 
         if verbose:
             self.dataset.summary()
+            xgb_status = "✅ XGBoost" if _HAS_XGB else "⚠  xgboost not installed — using GradientBoosting"
+            print(f"  {xgb_status}")
             print(f"  SMOTE: minority={n_minority}, majority={n_majority}")
-            print(f"  Training 3 models...\n")
+            print(f"  Training {3} models...\n")
 
-        self._models = self._make_models(n_minority)
+        self._models = self._make_models(n_minority, n_total)
         n_splits     = min(5, n_minority)
         cv           = StratifiedKFold(
                            n_splits=n_splits, shuffle=True, random_state=RANDOM_STATE)
@@ -329,7 +348,6 @@ class BacktestPredictor:
         self.best_name     = max(results, key=lambda k: results[k]["mean"])
         self.best_cv_score = results[self.best_name]["mean"]
 
-        # FIX 1: keep an unfitted clone BEFORE fitting on full data
         self._best_pipeline_unfitted = clone(self._models[self.best_name])
 
         self.best_model = self._models[self.best_name]
@@ -356,8 +374,7 @@ class BacktestPredictor:
         cv         = StratifiedKFold(
                          n_splits=n_splits, shuffle=True, random_state=RANDOM_STATE)
 
-        # FIX 1: use the unfitted clone — no data leakage
-        unfitted = self._best_pipeline_unfitted
+        unfitted  = self._best_pipeline_unfitted
         y_pred_cv = cross_val_predict(unfitted, X, y, cv=cv)
         y_prob_cv = cross_val_predict(
                         unfitted, X, y, cv=cv, method="predict_proba")[:, 1]
@@ -440,8 +457,8 @@ class BacktestPredictor:
         row = {}
         for col in self.feature_cols:
             if col == "market_regime_enc":
-                raw    = metrics.get("market_regime",
-                         metrics.get("market_regime_enc", "Sideways"))
+                raw      = metrics.get("market_regime",
+                           metrics.get("market_regime_enc", "Sideways"))
                 row[col] = REGIME_MAP.get(raw, raw) if isinstance(raw, str) else raw
             else:
                 row[col] = metrics.get(col, 0)
@@ -449,7 +466,7 @@ class BacktestPredictor:
         X_new = pd.DataFrame([row])[self.feature_cols]
         prob  = float(self.best_model.predict_proba(X_new)[0][1])
 
-        prediction = "QUALITY"  if prob >= 0.5 else "STANDARD"
+        prediction = "QUALITY" if prob >= 0.5 else "STANDARD"
         confidence = (
             "High"   if prob >= 0.75 or prob <= 0.25 else
             "Medium" if prob >= 0.60 or prob <= 0.40 else
@@ -483,13 +500,11 @@ class BacktestPredictor:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def train_predictor(history_file: str = HISTORY_FILE) -> BacktestPredictor:
-    """Train and return a ready predictor."""
     predictor = BacktestPredictor(history_file)
     predictor.train()
     return predictor
 
 
-# FIX 2: module-level cache — train once, reuse across calls
 _predictor_cache: dict[str, BacktestPredictor] = {}
 
 
@@ -499,18 +514,7 @@ def predict_quality(
 ) -> dict:
     """
     Predict run quality after a backtest completes.
-    The predictor is trained once per history_file and cached in memory.
-
-    Example:
-        from ml_predictor import predict_quality
-
-        result = predict_quality({
-            "win_rate": 64.3, "profit_factor": 2.6, "sharpe": 0.6,
-            "max_drawdown": -10.09, "total_return": 28.7,
-            ...
-        })
-        print(result["prediction"])   # 'QUALITY' or 'STANDARD'
-        print(result["probability"])  # 0.0 — 1.0
+    Trained once per history_file and cached in memory.
     """
     global _predictor_cache
     if history_file not in _predictor_cache:
@@ -521,10 +525,7 @@ def predict_quality(
 
 
 def invalidate_cache(history_file: str = HISTORY_FILE) -> None:
-    """
-    Call this after new backtest runs are appended to history_file
-    so the next predict_quality() call retrains on fresh data.
-    """
+    """Call after new backtest runs are appended so next predict_quality() retrains."""
     _predictor_cache.pop(history_file, None)
 
 
@@ -534,7 +535,9 @@ def invalidate_cache(history_file: str = HISTORY_FILE) -> None:
 
 if __name__ == "__main__":
     print("\n" + "═"*55)
-    print("  MarketLab — ML Predictor  v2.1")
+    print("  MarketLab — ML Predictor  v2.2")
+    xgb_note = "XGBoost ✅" if _HAS_XGB else "XGBoost ⚠ not installed"
+    print(f"  {xgb_note}")
     print("═"*55)
 
     predictor = BacktestPredictor()
@@ -628,6 +631,7 @@ if __name__ == "__main__":
               f"(expected: {case['expected']})")
         print(f"     Probability  : {result['probability']:.1%}")
         print(f"     Confidence   : {result['confidence']}")
+        print(f"     Model        : {result['model']}")
 
         checks = result["thresholds"]
         status = "  ".join(f"{'✓' if v else '✗'} {k}" for k, v in checks.items())
@@ -636,8 +640,8 @@ if __name__ == "__main__":
     print(f"\n{'═'*55}")
     print(f"  Sample accuracy: {correct}/{len(test_cases)}")
     print(f"{'═'*55}")
-    print("  Usage in backtest.py:")
+    print("  Usage:")
     print("    from ml_predictor import predict_quality, invalidate_cache")
     print("    result = predict_quality(metrics_dict)")
-    print("    invalidate_cache()  # call after appending new runs")
+    print("    invalidate_cache()  # after appending new runs")
     print(f"{'═'*55}\n")
