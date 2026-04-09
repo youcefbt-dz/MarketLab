@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="logo.svg" alt="MarketLab" width="420"/>
+<img src="assets/logo.svg" alt="MarketLab" width="420"/>
 
 <br/>
 
@@ -312,32 +312,45 @@ python strategy_optimizer.py --apply
 ```
 MarketLab/
 │
-├── main.py                  # Entry point — 5 modes
-├── signals.py               # Signal engine (13 rules, ATR exits)
-├── backtest.py              # Walk-forward backtesting engine
-├── backtest_logger.py       # Black Box Logger + reliability score
-├── strategy_optimizer.py    # Bayesian parameter optimizer (Optuna)
-├── watchlist_scanner.py     # Parallel 250+ ticker scanner
-├── sentiment.py             # NLP sentiment (VADER + boosters)
-├── report_generator.py      # PDF report builder (ReportLab)
-├── stock_warehouse.py       # Local data warehouse (250+ symbols)
+├── main.py                        # Entry point — 5 modes
 │
-├── companies.json           # 240+ name → ticker mappings
-├── requirements.txt
-├── logo.svg
+├── core/                          # Signal & data engine
+│   ├── signals.py                 # Signal engine (13 rules, ATR exits)
+│   ├── sentiment.py               # NLP sentiment (VADER + boosters)
+│   ├── stock_warehouse.py         # Local data warehouse (250+ symbols)
+│   └── crypto_warehouse.py        # Crypto data layer
 │
-├── data/                    # Local CSV warehouse (gitignored)
+├── analysis/                      # Research & simulation
+│   ├── backtest.py                # Walk-forward backtesting engine
+│   ├── backtest_logger.py         # Black Box Logger + reliability score
+│   ├── batch_backtest.py          # Batch runner for ML data generation
+│   ├── ml_predictor.py            # ML quality predictor (XGBoost + SMOTE)
+│   ├── strategy_optimizer.py      # Bayesian parameter optimizer (Optuna)
+│   └── watchlist_scanner.py       # Parallel 250+ ticker scanner
+│
+├── ui/                            # Output & presentation
+│   └── report_generator.py        # PDF report builder (ReportLab)
+│
+├── assets/                        # Static assets
+│   └── logo.svg
+│
+├── config/                        # Configuration files
+│   ├── companies.json             # 240+ name → ticker mappings
+│   ├── crypto_symbols.json
+│   └── requirements.txt
+│
+├── data/                          # Local CSV warehouse (gitignored)
 │   ├── AAPL.csv
 │   ├── MSFT.csv
 │   └── _metadata.json
 │
-├── backtest_results/        # Trade logs, equity curves, reports
-├── backtest_history.json    # Accumulated backtest runs
-├── best_params.json         # Latest optimizer output
+├── docs/                          # Documentation & screenshots
+│   └── screenshots/
 │
-└── docs/
-    ├── index.html           # Landing page
-    └── screenshots/
+├── backtest_results/              # Trade logs, equity curves, reports
+├── backtest_history.json          # Accumulated backtest runs
+└── best_params.json               # Latest optimizer output
+
 ```
 
 ---
