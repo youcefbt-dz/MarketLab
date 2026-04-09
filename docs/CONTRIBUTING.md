@@ -63,19 +63,46 @@ git push origin feature/your-feature-name
 ## Project Structure
 
 ```
-python-finance-analyst/
+MarketLab/
 │
-├── main.py               # Entry point — Live Analysis mode
-├── backtest.py           # Backtesting engine (walk-forward, ATR-based exits)
-├── backtest_logger.py    # Black Box Logger + Reliability Score engine
-├── signals.py            # Signal generation (13-rule scoring system)
-├── ml_predictor.py       # ML Pipeline (SMOTE + RandomForest/GB/LR)
-├── sentiment.py          # NLP sentiment analysis (VADER + financial boosters)
-├── report_generator.py   # PDF report builder (ReportLab)
-├── stock_warehouse.py    # Local data warehouse (250+ symbols)
-├── companies.json        # 240+ company name → ticker mappings
-├── requirements.txt      # Python dependencies
-└── logo.svg              # Project logo
+├── main.py                        # Entry point — 5 modes
+│
+├── core/                          # Signal & data engine
+│   ├── signals.py                 # Signal engine (13 rules, ATR exits)
+│   ├── sentiment.py               # NLP sentiment (VADER + boosters)
+│   ├── stock_warehouse.py         # Local data warehouse (250+ symbols)
+│   └── crypto_warehouse.py        # Crypto data layer
+│
+├── analysis/                      # Research & simulation
+│   ├── backtest.py                # Walk-forward backtesting engine
+│   ├── backtest_logger.py         # Black Box Logger + reliability score
+│   ├── batch_backtest.py          # Batch runner for ML data generation
+│   ├── ml_predictor.py            # ML quality predictor (XGBoost + SMOTE)
+│   ├── strategy_optimizer.py      # Bayesian parameter optimizer (Optuna)
+│   └── watchlist_scanner.py       # Parallel 250+ ticker scanner
+│
+├── ui/                            # Output & presentation
+│   └── report_generator.py        # PDF report builder (ReportLab)
+│
+├── assets/                        # Static assets
+│   └── logo.svg
+│
+├── config/                        # Configuration files
+│   ├── companies.json             # 240+ name → ticker mappings
+│   ├── crypto_symbols.json
+│   └── requirements.txt
+│
+├── data/                          # Local CSV warehouse (gitignored)
+│   ├── AAPL.csv
+│   ├── MSFT.csv
+│   └── _metadata.json
+│
+├── docs/                          # Documentation & screenshots
+│   └── screenshots/
+│
+├── backtest_results/              # Trade logs, equity curves, reports
+├── backtest_history.json          # Accumulated backtest runs
+└── best_params.json               # Latest optimizer output
 ```
 
 ---
