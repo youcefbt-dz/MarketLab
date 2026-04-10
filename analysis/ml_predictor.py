@@ -529,10 +529,6 @@ def invalidate_cache(history_file: str = HISTORY_FILE) -> None:
     _predictor_cache.pop(history_file, None)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# DEMO — python ml_predictor.py
-# ═══════════════════════════════════════════════════════════════════════════════
-
 if __name__ == "__main__":
     print("\n" + "═"*55)
     print("  MarketLab — ML Predictor  v2.2")
