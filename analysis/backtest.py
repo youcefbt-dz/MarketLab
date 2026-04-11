@@ -1,14 +1,6 @@
 """
 backtest.py — MarketLab Backtesting Engine
 Walk-forward simulation with warehouse-first data loading.
-
-Changes from previous version:
-  - fetch_and_prepare()    → uses load_local() instead of yfinance
-  - fetch_market_returns() → uses load_local('SPY') instead of yfinance
-  - compute_benchmark()    → uses load_local() instead of yfinance
-  - Removed duplicate code blocks
-  - Fixed POSITION_PCT undefined variable
-  - AUTO_PLANS mode fully integrated with warehouse
 """
 from __future__ import annotations
 
@@ -16,6 +8,7 @@ import csv
 import json
 import os
 from datetime import datetime
+from typing import Optional
 
 import matplotlib
 matplotlib.use("Agg")
@@ -24,9 +17,9 @@ import numpy as np
 import pandas as pd
 import pandas_ta as ta
 
-from core.signals          import generate_signal, BUY_THRESHOLD, SELL_THRESHOLD
+from core.signals             import generate_signal, BUY_THRESHOLD, SELL_THRESHOLD
 from analysis.backtest_logger import log_backtest_run
-from core.stock_warehouse  import load_local, load_companies
+from core.stock_warehouse     import load_local, load_companies
 
 
 # ─── CONSTANTS ────────────────────────────────────────────────────────────────
@@ -36,6 +29,11 @@ SLIPPAGE    = 0.001   # 0.1% slippage on entry/exit
 COOLDOWN    = 5       # days to wait after a loss before re-entering
 RISK_REWARD = 2.3     # Take Profit = risk × 2.3
 RESULTS_DIR = "backtest_results"
+
+TRADING_DAYS  = 252
+MAX_RF_RATE   = 0.20
+WARMUP_PERIOD = 252
+MAX_POSITION  = 0.40
 
 POSITION_SIZE_MAP = {
     "STRONG BUY" : 0.35,
@@ -49,64 +47,30 @@ MAX_PORTFOLIO_EXPOSURE = 0.70
 BAR      = "═" * 58
 THIN_BAR = "─" * 58
 
-AUTO_PLANS = [
-    {
-        "label"  : "Tech Giants — 5Y",
-        "tickers": ["AAPL", "MSFT", "NVDA", "GOOGL", "META"],
-        "start"  : "2020-01-01",
-    },
-    {
-        "label"  : "High Volatility — 3Y",
-        "tickers": ["TSLA", "COIN", "PLTR", "MSTR", "RIVN"],
-        "start"  : "2022-01-01",
-    },
-    {
-        "label"  : "Diversified — 7Y",
-        "tickers": ["AAPL", "JPM", "XOM", "JNJ", "WMT"],
-        "start"  : "2018-01-01",
-    },
-    {
-        "label"  : "Growth — 4Y",
-        "tickers": ["NVDA", "AMZN", "CRM", "NOW", "CRWD"],
-        "start"  : "2021-01-01",
-    },
-    {
-        "label"  : "Finance & Pharma — 5Y",
-        "tickers": ["GS", "JPM", "LLY", "ABBV", "PFE"],
-        "start"  : "2020-01-01",
-    },
-    {
-        "label"  : "Bull Run — 2Y",
-        "tickers": ["AAPL", "MSFT", "AMZN", "TSLA", "NVDA"],
-        "start"  : "2023-01-01",
-    },
-    {
-        "label"  : "Bear Test — crisis period",
-        "tickers": ["AAPL", "MSFT", "AMZN", "GOOGL", "META"],
-        "start"  : "2022-01-01",
-    },
-    {
-        "label"  : "Broad Market — 10Y",
-        "tickers": ["SPY", "QQQ", "AAPL", "MSFT", "JPM"],
-        "start"  : "2015-01-01",
-    },
+AUTO_PLANS: list[dict] = [
+    {"label": "Tech Giants — 5Y",          "tickers": ["AAPL", "MSFT", "NVDA", "GOOGL", "META"], "start": "2020-01-01"},
+    {"label": "High Volatility — 3Y",      "tickers": ["TSLA", "COIN", "PLTR", "MSTR", "RIVN"],  "start": "2022-01-01"},
+    {"label": "Diversified — 7Y",          "tickers": ["AAPL", "JPM",  "XOM",  "JNJ",  "WMT"],   "start": "2018-01-01"},
+    {"label": "Growth — 4Y",               "tickers": ["NVDA", "AMZN", "CRM",  "NOW",  "CRWD"],  "start": "2021-01-01"},
+    {"label": "Finance & Pharma — 5Y",     "tickers": ["GS",   "JPM",  "LLY",  "ABBV", "PFE"],   "start": "2020-01-01"},
+    {"label": "Bull Run — 2Y",             "tickers": ["AAPL", "MSFT", "AMZN", "TSLA", "NVDA"],  "start": "2023-01-01"},
+    {"label": "Bear Test — crisis period", "tickers": ["AAPL", "MSFT", "AMZN", "GOOGL","META"],  "start": "2022-01-01"},
+    {"label": "Broad Market — 10Y",        "tickers": ["SPY",  "QQQ",  "AAPL", "MSFT", "JPM"],   "start": "2015-01-01"},
 ]
+
+# Reusable placeholder for signal generation (no live price data needed in backtest)
+_DUMMY_INFO: dict = {
+    "currentPrice"    : 0,
+    "marketCap"       : "N/A",
+    "fiftyTwoWeekHigh": 0,
+    "fiftyTwoWeekLow" : 0,
+}
 
 
 # ─── HELPERS ──────────────────────────────────────────────────────────────────
 
-def get_position_size(
-    signal: str,
-    score: int,
-    available_cash: float,
-    current_exposure: float = 0.0,
-) -> float:
-    base_pct           = POSITION_SIZE_MAP.get(signal, DEFAULT_POSITION_PCT)
-    remaining_capacity = MAX_PORTFOLIO_EXPOSURE - current_exposure
-    if remaining_capacity <= 0:
-        return 0.0
-    final_pct = min(base_pct, remaining_capacity, 0.40)
-    return available_cash * final_pct
+def today_str() -> str:
+    return datetime.today().strftime("%Y-%m-%d")
 
 
 def section(title: str) -> None:
@@ -134,8 +98,18 @@ def ensure_results_dir() -> None:
     os.makedirs(RESULTS_DIR, exist_ok=True)
 
 
+def _json_serializer(obj):
+    """Custom JSON serializer for numpy types."""
+    if isinstance(obj, np.integer):  return int(obj)
+    if isinstance(obj, np.floating): return float(obj)
+    if isinstance(obj, np.bool_):    return bool(obj)
+    if isinstance(obj, np.ndarray):  return obj.tolist()
+    raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
+
+
+# ─── TICKER RESOLUTION ────────────────────────────────────────────────────────
+
 def validate_ticker(ticker: str) -> bool:
-    """Check if ticker exists in warehouse."""
     try:
         load_local(ticker)
         return True
@@ -153,139 +127,204 @@ def resolve_ticker(query: str, name_to_ticker: dict) -> str:
     return query_upper
 
 
-# ─── DATA PREPARATION — WAREHOUSE FIRST ──────────────────────────────────────
+# ─── DATA LOADING ─────────────────────────────────────────────────────────────
 
-def fetch_and_prepare(ticker: str, start: str, end: str) -> pd.DataFrame | None:
-    """
-    Load OHLCV from local warehouse and compute all indicators.
-    Falls back to yfinance only if ticker not in warehouse.
-    """
+def _load_from_yfinance(ticker: str, start: str, end: str) -> Optional[pd.DataFrame]:
+    """Fallback loader using yfinance. Returns raw DataFrame or None."""
+    try:
+        import yfinance as yf
+        print(f"  ⚠  {ticker} not in warehouse — fetching from yfinance…")
+        df = yf.Ticker(ticker).history(start=start, end=end)
+        return df if not df.empty else None
+    except Exception as e:
+        print(f"  ✗  Failed to fetch {ticker}: {e}")
+        return None
+
+
+def fetch_and_prepare(ticker: str, start: str, end: str) -> Optional[pd.DataFrame]:
+    """Load OHLCV from warehouse (or yfinance fallback) and compute all indicators."""
     try:
         df = load_local(ticker).set_index("Date")
         df.index = pd.to_datetime(df.index)
     except FileNotFoundError:
-        # Fallback: try yfinance
-        try:
-            import yfinance as yf
-            print(f"  ⚠  {ticker} not in warehouse — fetching from yfinance…")
-            df = yf.Ticker(ticker).history(start=start, end=end)
-            if df.empty:
-                print(f"  ✗  No data for {ticker}.")
-                return None
-        except Exception as e:
-            print(f"  ✗  Failed to fetch {ticker}: {e}")
+        df = _load_from_yfinance(ticker, start, end)
+        if df is None:
+            print(f"  ✗  No data for {ticker}.")
             return None
     except Exception as e:
         print(f"  ✗  Error loading {ticker}: {e}")
         return None
 
-    # Filter to requested date range
-    start_dt = pd.Timestamp(start)
-    end_dt   = pd.Timestamp(end)
+    start_dt, end_dt = pd.Timestamp(start), pd.Timestamp(end)
     df = df[(df.index >= start_dt) & (df.index <= end_dt)]
 
-    if len(df) < 250:
+    if len(df) < WARMUP_PERIOD:
         print(f"  ⚠  Not enough data for {ticker} in {start} → {end} ({len(df)} rows).")
         return None
 
-    # Compute indicators
-    df["Stock_Return"] = df["Close"].pct_change()
-    df["MA50"]         = df["Close"].rolling(50).mean()
-    df["MA200"]        = df["Close"].rolling(200).mean()
-    df["EMA20"]        = df["Close"].ewm(span=20, adjust=False).mean()
-    df["RSI"]          = ta.rsi(df["Close"], length=14)
-    df["BB_middle"]    = df["Close"].rolling(20).mean()
-    df["BB_std"]       = df["Close"].rolling(20).std()
-    df["BB_upper"]     = df["BB_middle"] + df["BB_std"] * 2
-    df["BB_lower"]     = df["BB_middle"] - df["BB_std"] * 2
-    df["MACD"]         = (df["Close"].ewm(span=12, adjust=False).mean()
-                          - df["Close"].ewm(span=26, adjust=False).mean())
-    df["Signal_line"]  = df["MACD"].ewm(span=9, adjust=False).mean()
-    df["Histogram"]    = df["MACD"] - df["Signal_line"]
-    df["L14"]          = df["Low"].rolling(14).min()
-    df["H14"]          = df["High"].rolling(14).max()
-    df["%K"]           = (df["Close"] - df["L14"]) / (df["H14"] - df["L14"] + 1e-9) * 100
-    df["%D"]           = df["%K"].rolling(3).mean()
-
-    df.dropna(inplace=True)
+    df = _compute_indicators(df)
 
     if df.empty:
-        print(f"  ⚠  No data left for {ticker} after dropna.")
+        print(f"  ⚠  No data left for {ticker} after computing indicators.")
         return None
 
     return df
 
 
+def _compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
+    """Add all technical indicators to OHLCV DataFrame."""
+    close = df["Close"]
+
+    df["Stock_Return"] = close.pct_change()
+    df["MA50"]         = close.rolling(50).mean()
+    df["MA200"]        = close.rolling(200).mean()
+    df["EMA20"]        = close.ewm(span=20, adjust=False).mean()
+    df["RSI"]          = ta.rsi(close, length=14)
+
+    bb_mid             = close.rolling(20).mean()
+    bb_std             = close.rolling(20).std()
+    df["BB_middle"]    = bb_mid
+    df["BB_upper"]     = bb_mid + bb_std * 2
+    df["BB_lower"]     = bb_mid - bb_std * 2
+
+    macd               = close.ewm(span=12, adjust=False).mean() - close.ewm(span=26, adjust=False).mean()
+    signal_line        = macd.ewm(span=9, adjust=False).mean()
+    df["MACD"]         = macd
+    df["Signal_line"]  = signal_line
+    df["Histogram"]    = macd - signal_line
+
+    l14                = df["Low"].rolling(14).min()
+    h14                = df["High"].rolling(14).max()
+    df["%K"]           = (close - l14) / (h14 - l14 + 1e-9) * 100
+    df["%D"]           = df["%K"].rolling(3).mean()
+
+    df.dropna(inplace=True)
+    return df
+
+
 def fetch_market_returns(start: str, end: str) -> pd.Series:
-    """Load SPY from warehouse for market regime calculations."""
+    """Load SPY returns for market regime calculations."""
     try:
         df = load_local("SPY").set_index("Date")
         df.index = pd.to_datetime(df.index)
-        start_dt = pd.Timestamp(start)
-        end_dt   = pd.Timestamp(end)
+        start_dt, end_dt = pd.Timestamp(start), pd.Timestamp(end)
         df = df[(df.index >= start_dt) & (df.index <= end_dt)]
         return df["Close"].pct_change().rename("Market_Return")
     except FileNotFoundError:
         print("  ⚠  SPY not in warehouse — fetching from yfinance…")
-        try:
-            import yfinance as yf
-            df = yf.Ticker("^GSPC").history(start=start, end=end)
-            return df["Close"].pct_change().rename("Market_Return")
-        except Exception:
-            return pd.Series(dtype=float, name="Market_Return")
+        raw = _load_from_yfinance("^GSPC", start, end)
+        if raw is not None:
+            return raw["Close"].pct_change().rename("Market_Return")
+        return pd.Series(dtype=float, name="Market_Return")
 
 
-def compute_benchmark(ticker: str, start: str, end: str, initial_cash: float) -> float:
-    """Buy & Hold return — uses warehouse, no internet call needed."""
+def compute_benchmark(ticker: str, start: str, end: str) -> float:
+    """Buy & Hold return for the given ticker and period."""
     try:
         df = load_local(ticker).set_index("Date")
         df.index = pd.to_datetime(df.index)
-        start_dt = pd.Timestamp(start)
-        end_dt   = pd.Timestamp(end)
-        df = df[(df.index >= start_dt) & (df.index <= end_dt)]
-        if len(df) < 2:
-            return 0.0
-        p_start = df["Close"].iloc[0]
-        p_end   = df["Close"].iloc[-1]
-        return round((p_end - p_start) / p_start * 100, 2)
     except FileNotFoundError:
-        try:
-            import yfinance as yf
-            df    = yf.Ticker(ticker).history(start=start, end=end)
-            return round((df["Close"].iloc[-1] - df["Close"].iloc[0])
-                         / df["Close"].iloc[0] * 100, 2)
-        except Exception:
-            return 0.0
+        raw = _load_from_yfinance(ticker, start, end)
+        df  = raw if raw is not None else pd.DataFrame()
+
+    start_dt, end_dt = pd.Timestamp(start), pd.Timestamp(end)
+    df = df[(df.index >= start_dt) & (df.index <= end_dt)]
+
+    if len(df) < 2:
+        return 0.0
+
+    p_start, p_end = df["Close"].iloc[0], df["Close"].iloc[-1]
+    return round((p_end - p_start) / p_start * 100, 2)
 
 
 # ─── CORE SIMULATION ──────────────────────────────────────────────────────────
+
+def get_position_size(
+    signal: str,
+    score: int,
+    available_cash: float,
+    current_exposure: float = 0.0,
+) -> float:
+    base_pct           = POSITION_SIZE_MAP.get(signal, DEFAULT_POSITION_PCT)
+    remaining_capacity = MAX_PORTFOLIO_EXPOSURE - current_exposure
+    if remaining_capacity <= 0:
+        return 0.0
+    final_pct = min(base_pct, remaining_capacity, MAX_POSITION)
+    return available_cash * final_pct
+
 
 def _precompute_rolling_metrics(
     df: pd.DataFrame,
     mkt_returns: pd.Series,
     annual_rf: float,
-    window: int = 252,
+    window: int = TRADING_DAYS,
 ) -> pd.DataFrame:
     ret      = df["Stock_Return"]
     mkt      = mkt_returns.reindex(df.index)
-    daily_rf = annual_rf / 252
+    daily_rf = annual_rf / TRADING_DAYS
 
     excess         = ret - daily_rf
-    roll_mean      = excess.rolling(window).mean()
     roll_std       = excess.rolling(window).std()
-    rolling_sharpe = (roll_mean / (roll_std + 1e-9)) * np.sqrt(252)
+    rolling_sharpe = (excess.rolling(window).mean() / (roll_std + 1e-9)) * np.sqrt(TRADING_DAYS)
+    rolling_ann_ret = (1 + ret.rolling(window).mean()) ** TRADING_DAYS - 1
 
-    rolling_ann_ret = (1 + ret.rolling(window).mean()) ** 252 - 1
-
-    roll_cov     = ret.rolling(window).cov(mkt)
     roll_var     = mkt.rolling(window).var()
-    rolling_beta = roll_cov / (roll_var + 1e-9)
+    rolling_beta = ret.rolling(window).cov(mkt) / (roll_var + 1e-9)
 
-    return pd.DataFrame({
-        "rolling_sharpe" : rolling_sharpe,
-        "rolling_ann_ret": rolling_ann_ret,
-        "rolling_beta"   : rolling_beta,
-    }, index=df.index)
+    return pd.DataFrame(
+        {"rolling_sharpe": rolling_sharpe, "rolling_ann_ret": rolling_ann_ret, "rolling_beta": rolling_beta},
+        index=df.index,
+    )
+
+
+def _exit_price_and_reason(
+    position: dict, open_price: float, high: float, low: float
+) -> tuple[Optional[float], Optional[str]]:
+    """Check SL/TP conditions. Returns (exit_price, reason) or (None, None)."""
+    sl, tp = position["sl"], position["tp"]
+    if   open_price < sl: return open_price, "Hit SL (Gap Down)"
+    elif open_price > tp: return open_price, "Hit TP (Gap Up)"
+    elif low  <= sl:      return sl, "Hit SL"
+    elif high >= tp:      return tp, "Hit TP"
+    return None, None
+
+
+def _close_position(
+    position: dict,
+    exit_price: float,
+    exit_date,
+    reason: str,
+    ticker: str,
+    initial_cash: float,
+) -> tuple[dict, float]:
+    """
+    Apply slippage/commission to exit, compute P&L, build trade record.
+    Returns (trade_dict, cash_proceeds).
+    """
+    net_price = exit_price * (1 - SLIPPAGE) * (1 - COMMISSION)
+    proceeds  = position["shares"] * net_price
+    pnl       = proceeds - position["cost"]
+    pnl_pct   = pnl / position["cost"] * 100
+    hold_days = (exit_date - position["entry_date"]).days
+
+    trade = {
+        "ticker"      : ticker,
+        "entry_date"  : position["entry_date"].strftime("%Y-%m-%d"),
+        "entry_price" : round(position["entry_price"], 4),
+        "signal"      : position["signal"],
+        "score"       : position["score"],
+        "position_pct": position.get("position_pct", 0),
+        "stop_loss"   : round(position["sl"], 4),
+        "take_profit" : round(position["tp"], 4),
+        "exit_date"   : exit_date.strftime("%Y-%m-%d"),
+        "exit_price"  : round(net_price, 4),
+        "exit_reason" : reason,
+        "hold_days"   : hold_days,
+        "pnl"         : round(pnl, 2),
+        "pnl_pct"     : round(pnl_pct, 2),
+        "result"      : "WIN" if pnl > 0 else "LOSS",
+    }
+    return trade, proceeds
 
 
 def run_backtest(
@@ -295,23 +334,14 @@ def run_backtest(
     initial_cash: float,
     annual_rf:    float = 0.04,
 ) -> dict:
-    rolling = _precompute_rolling_metrics(df, mkt_returns, annual_rf)
-
+    rolling       = _precompute_rolling_metrics(df, mkt_returns, annual_rf)
     cash          = initial_cash
     position      = None
     equity_curve  = []
     trades        = []
     cooldown_left = 0
-    warmup        = 252
 
-    dummy_info = {
-        "currentPrice"    : 0,
-        "marketCap"       : "N/A",
-        "fiftyTwoWeekHigh": 0,
-        "fiftyTwoWeekLow" : 0,
-    }
-
-    for i in range(warmup, len(df)):
+    for i in range(WARMUP_PERIOD, len(df)):
         today      = df.index[i]
         open_price = df["Open"].iloc[i]
         price      = df["Close"].iloc[i]
@@ -325,50 +355,15 @@ def run_backtest(
 
         # ── SL / TP check ─────────────────────────────────────────────────────
         if position:
-            sl = position["sl"]
-            tp = position["tp"]
-
-            if open_price < sl:
-                exit_price, reason = open_price, "Hit SL (Gap Down)"
-            elif open_price > tp:
-                exit_price, reason = open_price, "Hit TP (Gap Up)"
-            elif low <= sl:
-                exit_price, reason = sl, "Hit SL"
-            elif high >= tp:
-                exit_price, reason = tp, "Hit TP"
-            else:
-                exit_price, reason = None, None
-
+            exit_price, reason = _exit_price_and_reason(position, open_price, high, low)
             if exit_price is not None:
-                exit_price *= (1 - SLIPPAGE) * (1 - COMMISSION)
-                proceeds    = position["shares"] * exit_price
-                pnl         = proceeds - position["cost"]
-                pnl_pct     = pnl / position["cost"] * 100
-                result      = "WIN" if pnl > 0 else "LOSS"
-
-                hold_days = (today - position["entry_date"]).days
-
-                trades.append({
-                    "ticker"      : ticker,
-                    "entry_date"  : position["entry_date"].strftime("%Y-%m-%d"),
-                    "entry_price" : round(position["entry_price"], 4),
-                    "signal"      : position["signal"],
-                    "score"       : position["score"],
-                    "position_pct": position.get("position_pct", 0),
-                    "stop_loss"   : round(sl, 4),
-                    "take_profit" : round(tp, 4),
-                    "exit_date"   : today.strftime("%Y-%m-%d"),
-                    "exit_price"  : round(exit_price, 4),
-                    "exit_reason" : reason,
-                    "hold_days"   : hold_days,
-                    "pnl"         : round(pnl, 2),
-                    "pnl_pct"     : round(pnl_pct, 2),
-                    "result"      : result,
-                })
-
+                trade, proceeds = _close_position(
+                    position, exit_price, today, reason, ticker, initial_cash
+                )
+                trades.append(trade)
                 cash     += proceeds
                 position  = None
-                if result == "LOSS":
+                if trade["result"] == "LOSS":
                     cooldown_left = COOLDOWN
 
         # ── Signal generation ─────────────────────────────────────────────────
@@ -385,10 +380,9 @@ def run_backtest(
 
             slice_df  = df.iloc[: i + 1]
             mkt_slice = mkt_returns.reindex(slice_df.index)
-
-            result = generate_signal(slice_df, dummy_info, metrics, mkt_slice)
-            sig    = result.get("signal", "HOLD")
-            score  = result.get("score",  0)
+            result    = generate_signal(slice_df, _DUMMY_INFO, metrics, mkt_slice)
+            sig       = result.get("signal", "HOLD")
+            score     = result.get("score",  0)
 
             if sig in ("BUY", "STRONG BUY"):
                 entry_price = price * (1 + SLIPPAGE) * (1 + COMMISSION)
@@ -414,32 +408,17 @@ def run_backtest(
                     }
                     cash -= shares * entry_price
 
-    # ── Close open position at end ────────────────────────────────────────────
+    # ── Close open position at end of period ──────────────────────────────────
     if position:
-        last_price = df["Close"].iloc[-1] * (1 - SLIPPAGE) * (1 - COMMISSION)
-        proceeds   = position["shares"] * last_price
-        pnl        = proceeds - position["cost"]
-        pnl_pct    = pnl / position["cost"] * 100
-
-        hold_days = (df.index[-1] - position["entry_date"]).days
-
-        trades.append({
-            "ticker"      : ticker,
-            "entry_date"  : position["entry_date"].strftime("%Y-%m-%d"),
-            "entry_price" : round(position["entry_price"], 4),
-            "signal"      : position["signal"],
-            "score"       : position["score"],
-            "position_pct": position.get("position_pct", 0),
-            "stop_loss"   : round(position["sl"], 4),
-            "take_profit" : round(position["tp"], 4),
-            "exit_date"   : df.index[-1].strftime("%Y-%m-%d"),
-            "exit_price"  : round(last_price, 4),
-            "exit_reason" : "End of Period",
-            "hold_days"   : hold_days,
-            "pnl"         : round(pnl, 2),
-            "pnl_pct"     : round(pnl_pct, 2),
-            "result"      : "WIN" if pnl > 0 else "LOSS",
-        })
+        trade, proceeds = _close_position(
+            position,
+            df["Close"].iloc[-1],
+            df.index[-1],
+            "End of Period",
+            ticker,
+            initial_cash,
+        )
+        trades.append(trade)
         cash += proceeds
 
     return {
@@ -459,75 +438,60 @@ def compute_metrics(result: dict) -> dict:
     if not trades:
         return {
             "verdict": "NO TRADES", "win_rate": 0, "profit_factor": 0,
-            "max_drawdown": 0, "total_trades": 0, "total_return": result["total_return"],
-            "sharpe": 0, "avg_r_multiple": 0, "max_consecutive_losses": 0,
-            "avg_position_by_signal": {}, "exit_reasons": {}, "passed": False,
+            "max_drawdown": 0, "total_trades": 0, "sharpe": 0,
+            "avg_r_multiple": 0, "max_consecutive_losses": 0, "avg_hold_days": 0,
+            "avg_position_by_signal": {}, "exit_reasons": {},
+            "total_return": result["total_return"], "passed": False,
         }
 
-    wins  = [t for t in trades if t["result"] == "WIN"]
-    losses = [t for t in trades if t["result"] == "LOSS"]
+    wins         = [t for t in trades if t["result"] == "WIN"]
+    losses       = [t for t in trades if t["result"] == "LOSS"]
+    win_rate     = len(wins) / len(trades) * 100
+    gross_profit = sum(t["pnl"] for t in wins)
+    gross_loss   = abs(sum(t["pnl"] for t in losses)) + 1e-9
 
-    win_rate      = len(wins) / len(trades) * 100
-    gross_profit  = sum(t["pnl"] for t in wins)
-    gross_loss    = abs(sum(t["pnl"] for t in losses)) + 1e-9
-    profit_factor = round(gross_profit / gross_loss, 2)
-
-    eq     = pd.Series([e["equity"] for e in result["equity_curve"]])
-    peak   = eq.cummax()
-    dd     = (eq - peak) / peak * 100
-    max_dd = round(dd.min(), 2)
-
+    eq         = pd.Series([e["equity"] for e in result["equity_curve"]])
+    max_dd     = round(((eq - eq.cummax()) / eq.cummax() * 100).min(), 2)
     eq_returns = eq.pct_change().dropna()
-    sharpe     = round((eq_returns.mean() / (eq_returns.std() + 1e-9)) * np.sqrt(252), 2)
+    sharpe     = round((eq_returns.mean() / (eq_returns.std() + 1e-9)) * np.sqrt(TRADING_DAYS), 2)
 
-    # Avg R-Multiple
-    r_multiples = []
-    for t in trades:
-        risk = abs(t["entry_price"] - t["stop_loss"])
-        if risk > 0:
-            r_multiples.append(
-                t["pnl"] / (risk * (t.get("position_pct", 20) / 100) * result["initial_cash"])
-            )
-    avg_r_multiple = round(np.mean(r_multiples), 2) if r_multiples else 0.0
+    r_multiples = [
+        t["pnl"] / (abs(t["entry_price"] - t["stop_loss"])
+                    * (t.get("position_pct", 20) / 100)
+                    * result["initial_cash"])
+        for t in trades
+        if abs(t["entry_price"] - t["stop_loss"]) > 0
+    ]
 
-    # Max Consecutive Losses
     max_consec = cur = 0
     for t in trades:
         cur = cur + 1 if t["result"] == "LOSS" else 0
         max_consec = max(max_consec, cur)
 
-    # Avg position by signal
-    sig_sizes: dict = {}
+    sig_sizes: dict[str, list] = {}
     for t in trades:
         sig_sizes.setdefault(t["signal"], []).append(t.get("position_pct", 20))
-    avg_position_by_signal = {s: round(np.mean(v), 1) for s, v in sig_sizes.items()}
 
-    # Exit reasons
-    exit_reasons: dict = {}
+    exit_reasons: dict[str, int] = {}
     for t in trades:
         r = t.get("exit_reason", "Unknown")
         exit_reasons[r] = exit_reasons.get(r, 0) + 1
 
-    # Avg Hold Days
-    hold_days_list = [t.get("hold_days", 0) for t in trades]
-    avg_hold_days  = round(np.mean(hold_days_list), 1) if hold_days_list else 0.0
-
-    passed  = win_rate >= 50 and profit_factor >= 1.3 and result["total_return"] > 0
-    verdict = "PASS ✅" if passed else "FAIL ❌"
+    passed  = win_rate >= 50 and gross_profit / gross_loss >= 1.3 and result["total_return"] > 0
 
     return {
-        "verdict"               : verdict,
+        "verdict"               : "PASS ✅" if passed else "FAIL ❌",
         "passed"                : passed,
         "total_trades"          : len(trades),
         "win_rate"              : round(win_rate, 1),
-        "profit_factor"         : profit_factor,
+        "profit_factor"         : round(gross_profit / gross_loss, 2),
         "max_drawdown"          : max_dd,
         "sharpe"                : sharpe,
         "total_return"          : result["total_return"],
-        "avg_r_multiple"        : avg_r_multiple,
+        "avg_r_multiple"        : round(np.mean(r_multiples), 2) if r_multiples else 0.0,
         "max_consecutive_losses": max_consec,
-        "avg_hold_days"         : avg_hold_days,
-        "avg_position_by_signal": avg_position_by_signal,
+        "avg_hold_days"         : round(np.mean([t.get("hold_days", 0) for t in trades]), 1),
+        "avg_position_by_signal": {s: round(np.mean(v), 1) for s, v in sig_sizes.items()},
         "exit_reasons"          : exit_reasons,
         "gross_profit"          : round(gross_profit, 2),
         "gross_loss"            : round(gross_loss,   2),
@@ -535,15 +499,6 @@ def compute_metrics(result: dict) -> dict:
 
 
 # ─── SAVING ───────────────────────────────────────────────────────────────────
-
-class _JSONEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, np.integer):  return int(obj)
-        if isinstance(obj, np.floating): return float(obj)
-        if isinstance(obj, np.bool_):    return bool(obj)
-        if isinstance(obj, np.ndarray):  return obj.tolist()
-        return super().default(obj)
-
 
 def save_trades_csv(all_trades: list, run_date: str) -> str:
     path = os.path.join(RESULTS_DIR, f"trades_{run_date}.csv")
@@ -559,7 +514,7 @@ def save_trades_csv(all_trades: list, run_date: str) -> str:
 def save_summary_json(summary: dict, run_date: str) -> str:
     path = os.path.join(RESULTS_DIR, f"summary_{run_date}.json")
     with open(path, "w", encoding="utf-8") as f:
-        json.dump(summary, f, indent=2, cls=_JSONEncoder)
+        json.dump(summary, f, indent=2, default=_json_serializer)
     return path
 
 
@@ -568,8 +523,6 @@ def save_summary_txt(summary: dict, run_date: str) -> str:
     s       = summary["strategy"]
     passed  = s["passed_count"]
     total   = s["total_tickers"]
-    acc     = s["accuracy_pct"]
-    verdict = s["overall_verdict"]
 
     lines = [
         "=" * 58,
@@ -582,14 +535,14 @@ def save_summary_txt(summary: dict, run_date: str) -> str:
         f"  Initial Capital : ${summary['settings']['initial_cash']:,.0f}",
         f"  Commission      : {COMMISSION*100:.1f}%  |  Slippage: {SLIPPAGE*100:.1f}%",
         "",
-        "─" * 58,
+        THIN_BAR,
         "  Per-Ticker Results",
-        "─" * 58,
+        THIN_BAR,
     ]
-    for t, m in summary["tickers"].items():
-        bh = summary["benchmarks"].get(t, 0)
+    for ticker, m in summary["tickers"].items():
+        bh = summary["benchmarks"].get(ticker, 0)
         lines.append(
-            f"  {t:<6}  {m['verdict']:<10}  "
+            f"  {ticker:<6}  {m['verdict']:<10}  "
             f"Return: {m['total_return']:+.1f}%  "
             f"B&H: {bh:+.1f}%  "
             f"WR: {m['win_rate']:.0f}%  "
@@ -601,12 +554,12 @@ def save_summary_txt(summary: dict, run_date: str) -> str:
         )
     lines += [
         "",
-        "─" * 58,
+        THIN_BAR,
         "  Strategy Accuracy",
-        "─" * 58,
+        THIN_BAR,
         f"  Signals Correct : {passed}/{total}",
-        f"  Accuracy        : {acc:.1f}%",
-        f"  Overall Verdict : {verdict}",
+        f"  Accuracy        : {s['accuracy_pct']:.1f}%",
+        f"  Overall Verdict : {s['overall_verdict']}",
         "=" * 58,
     ]
     with open(path, "w", encoding="utf-8") as f:
@@ -627,12 +580,10 @@ def plot_equity_curves(
             [e["equity"] for e in res["equity_curve"]],
             index=[e["date"] for e in res["equity_curve"]],
         )
-        norm = eq / initial_cash * 100
-        ax.plot(norm, label=f"{ticker} (strategy)", linewidth=1.5)
+        ax.plot(eq / initial_cash * 100, label=f"{ticker} (strategy)", linewidth=1.5)
 
     ax.axhline(100, color="black", linestyle="--", linewidth=1, label="Starting Capital")
-    ax.set_title("Equity Curves — Strategy vs Starting Capital",
-                 fontsize=14, fontweight="bold")
+    ax.set_title("Equity Curves — Strategy vs Starting Capital", fontsize=14, fontweight="bold")
     ax.set_ylabel("Portfolio Value (% of initial)")
     ax.set_xlabel("Date")
     ax.legend(fontsize=8)
@@ -646,51 +597,56 @@ def plot_equity_curves(
 
 # ─── PRINTING ─────────────────────────────────────────────────────────────────
 
+def _fmt_row(label: str, value: str) -> str:
+    return f"    {label:<20}: {value}"
+
+
 def print_ticker_result(ticker: str, metrics: dict, benchmark: float) -> None:
     section(f"{ticker}  ·  Backtest Result")
-    print(f"    Verdict         : {metrics['verdict']}")
-    print(f"    Total Return    : {metrics['total_return']:+.2f}%"
-          f"  (Buy & Hold: {benchmark:+.2f}%)")
-    print(f"    Total Trades    : {metrics['total_trades']}")
-    print(f"    Win Rate        : {metrics['win_rate']:.1f}%")
-    print(f"    Profit Factor   : {metrics['profit_factor']:.2f}")
-    print(f"    Max Drawdown    : {metrics['max_drawdown']:.2f}%")
-    print(f"    Sharpe Ratio    : {metrics['sharpe']:.2f}")
-    print(f"    Avg R-Multiple  : {metrics.get('avg_r_multiple', 0):.2f}")
-    print(f"    Max Consec Loss : {metrics.get('max_consecutive_losses', 0)}")
-    print(f"    Avg Hold Days   : {metrics.get('avg_hold_days', 0):.0f} days")
+    rows = [
+        ("Verdict",          metrics["verdict"]),
+        ("Total Return",     f"{metrics['total_return']:+.2f}%  (Buy & Hold: {benchmark:+.2f}%)"),
+        ("Total Trades",     str(metrics["total_trades"])),
+        ("Win Rate",         f"{metrics['win_rate']:.1f}%"),
+        ("Profit Factor",    f"{metrics['profit_factor']:.2f}"),
+        ("Max Drawdown",     f"{metrics['max_drawdown']:.2f}%"),
+        ("Sharpe Ratio",     f"{metrics['sharpe']:.2f}"),
+        ("Avg R-Multiple",   f"{metrics.get('avg_r_multiple', 0):.2f}"),
+        ("Max Consec Loss",  str(metrics.get("max_consecutive_losses", 0))),
+        ("Avg Hold Days",    f"{metrics.get('avg_hold_days', 0):.0f} days"),
+    ]
+    for label, value in rows:
+        print(_fmt_row(label, value))
 
     if metrics.get("avg_position_by_signal"):
-        print("    Avg Position %  :")
+        print(_fmt_row("Avg Position %", ""))
         for sig, pct in metrics["avg_position_by_signal"].items():
             print(f"        {sig:12s} : {pct:.1f}%")
 
     if metrics.get("exit_reasons"):
-        print("    Exit Reasons    :")
-        for reason, count in sorted(
-            metrics["exit_reasons"].items(), key=lambda x: -x[1]
-        ):
+        print(_fmt_row("Exit Reasons", ""))
+        for reason, count in sorted(metrics["exit_reasons"].items(), key=lambda x: -x[1]):
             print(f"        {reason:20s} : {count}")
 
 
 def print_strategy_summary(summary: dict) -> None:
     s = summary["strategy"]
-    print(f"\n{'═'*58}")
+    print(f"\n{BAR}")
     print("  Strategy Accuracy Report")
-    print(f"{'═'*58}")
+    print(BAR)
     print(f"  Signals Correct  : {s['passed_count']}/{s['total_tickers']}")
     print(f"  Accuracy         : {s['accuracy_pct']:.1f}%")
     print(f"  Overall Verdict  : {s['overall_verdict']}")
-    print(f"{'═'*58}")
+    print(BAR)
 
 
-# ─── STOCK SELECTION HELPERS ──────────────────────────────────────────────────
+# ─── STOCK SELECTION ──────────────────────────────────────────────────────────
 
 def _select_tickers_manual(name_to_ticker: dict) -> tuple[list[str], str, str]:
     num        = prompt_int("Number of stocks to backtest", 1, 20, 3)
     start_year = prompt_int("Backtest start year", 2015, 2024, 2020)
     start      = f"{start_year}-01-01"
-    end        = datetime.today().strftime("%Y-%m-%d")
+    end        = today_str()
 
     section("Stock Selection")
     tickers = []
@@ -709,14 +665,13 @@ def _select_tickers_manual(name_to_ticker: dict) -> tuple[list[str], str, str]:
 
 
 def _select_tickers_auto(name_to_ticker: dict) -> list[tuple[list[str], str, str, str]]:
-    end = datetime.today().strftime("%Y-%m-%d")
+    end = today_str()
 
     print(f"\n  {THIN_BAR}")
     print("  Available Plans:")
     print(f"  {THIN_BAR}")
     for i, plan in enumerate(AUTO_PLANS, 1):
-        t_str = ", ".join(plan["tickers"])
-        print(f"    [{i}] {plan['label']:<35} {plan['start']}  {t_str}")
+        print(f"    [{i}] {plan['label']:<35} {plan['start']}  {', '.join(plan['tickers'])}")
     print(f"    [A] Run All ({len(AUTO_PLANS)} plans)")
     print(f"  {THIN_BAR}")
 
@@ -745,20 +700,21 @@ def _select_tickers_auto(name_to_ticker: dict) -> list[tuple[list[str], str, str
 # ─── MAIN ─────────────────────────────────────────────────────────────────────
 
 def main() -> None:
-    print(f"\n{'═'*58}")
+    print(f"\n{BAR}")
     print("  MarketLab  ·  Backtesting Engine")
-    print(f"{'═'*58}")
+    print(BAR)
 
     ensure_results_dir()
-    run_date = datetime.today().strftime("%Y-%m-%d")
+    run_date = today_str()
 
     initial_cash = prompt_float("Initial capital ($)", 10000)
 
     print("  Risk-Free Rate  (10Y US Treasury ≈ 4.2%)")
     print("  Press Enter for 4.0% default.")
-    raw_rf = input("  Annual RF rate [%]: ").strip()
+    raw_rf    = input("  Annual RF rate [%]: ").strip()
+    annual_rf = max(0.0, min(float(raw_rf) / 100 if raw_rf else 0.04, MAX_RF_RATE))
     try:
-        annual_rf = max(0.0, min(float(raw_rf) / 100 if raw_rf else 0.04, 0.20))
+        annual_rf = max(0.0, min(float(raw_rf) / 100 if raw_rf else 0.04, MAX_RF_RATE))
     except ValueError:
         annual_rf = 0.04
     print(f"    ✔  Risk-free rate: {annual_rf * 100:.2f}%")
@@ -787,11 +743,11 @@ def main() -> None:
     grand_benchmarks = {}
 
     for plan_idx, (tickers, start, end, label) in enumerate(plans, 1):
-        print(f"\n{'═'*58}")
+        print(f"\n{BAR}")
         print(f"  Plan [{plan_idx}/{len(plans)}]: {label}")
         print(f"  Tickers : {', '.join(tickers)}")
         print(f"  Period  : {start}  →  {end}")
-        print(f"{'═'*58}")
+        print(BAR)
 
         mkt_returns     = fetch_market_returns(start, end)
         plan_results    = {}
@@ -800,9 +756,9 @@ def main() -> None:
         plan_benchmarks = {}
 
         for ticker in tickers:
-            print(f"\n{'─'*58}")
+            print(f"\n{THIN_BAR}")
             print(f"  Backtesting  {ticker}  ({start} → {end})")
-            print(f"{'─'*58}")
+            print(THIN_BAR)
 
             df = fetch_and_prepare(ticker, start, end)
             if df is None:
@@ -810,9 +766,9 @@ def main() -> None:
 
             result    = run_backtest(ticker, df, mkt_returns, initial_cash, annual_rf)
             metrics   = compute_metrics(result)
-            benchmark = compute_benchmark(ticker, start, end, initial_cash)
+            benchmark = compute_benchmark(ticker, start, end)
+            key       = f"{ticker}|{label}"
 
-            key = f"{ticker}|{label}"
             plan_results[key]    = result
             plan_metrics[key]    = metrics
             plan_benchmarks[key] = benchmark
@@ -826,12 +782,8 @@ def main() -> None:
                 end       = end,
                 metrics   = metrics,
                 benchmark = benchmark,
-                settings  = {
-                    "initial_cash": initial_cash,
-                    "commission"  : COMMISSION,
-                    "slippage"    : SLIPPAGE,
-                },
-                trades = result["trades"],
+                settings  = {"initial_cash": initial_cash, "commission": COMMISSION, "slippage": SLIPPAGE},
+                trades    = result["trades"],
             )
 
         grand_metrics.update(plan_metrics)
@@ -842,8 +794,7 @@ def main() -> None:
         if plan_metrics:
             p_pass = sum(1 for m in plan_metrics.values() if m.get("passed", False))
             p_tot  = len(plan_metrics)
-            print(f"\n  ✦  {label}: {p_pass}/{p_tot} passed"
-                  f" ({p_pass/p_tot*100:.0f}%)")
+            print(f"\n  ✦  {label}: {p_pass}/{p_tot} passed ({p_pass/p_tot*100:.0f}%)")
 
     if not grand_metrics:
         print("\n  ✗  No results to summarize.")
@@ -852,20 +803,17 @@ def main() -> None:
     passed_count = sum(1 for m in grand_metrics.values() if m.get("passed", False))
     total        = len(grand_metrics)
     accuracy     = passed_count / total * 100
-    overall      = "CREDIBLE STRATEGY ✅" if accuracy >= 60 else "NEEDS IMPROVEMENT ⚠️"
 
     summary = {
         "period"    : {"start": plans[0][1], "end": plans[0][2]},
-        "settings"  : {"initial_cash": initial_cash,
-                       "commission"  : COMMISSION,
-                       "slippage"    : SLIPPAGE},
+        "settings"  : {"initial_cash": initial_cash, "commission": COMMISSION, "slippage": SLIPPAGE},
         "tickers"   : grand_metrics,
         "benchmarks": grand_benchmarks,
         "strategy"  : {
             "passed_count"   : passed_count,
             "total_tickers"  : total,
             "accuracy_pct"   : round(accuracy, 1),
-            "overall_verdict": overall,
+            "overall_verdict": "CREDIBLE STRATEGY ✅" if accuracy >= 60 else "NEEDS IMPROVEMENT ⚠️",
         },
     }
 
@@ -875,11 +823,8 @@ def main() -> None:
     csv_path   = save_trades_csv(grand_trades,  run_date)
     json_path  = save_summary_json(summary,     run_date)
     txt_path   = save_summary_txt(summary,      run_date)
-    chart_path = plot_equity_curves(
-        grand_results, grand_benchmarks, initial_cash, run_date
-    )
+    chart_path = plot_equity_curves(grand_results, grand_benchmarks, initial_cash, run_date)
 
-    # Invalidate ML cache so next predict_quality() retrains on fresh data
     try:
         from ml_predictor import invalidate_cache
         invalidate_cache()
