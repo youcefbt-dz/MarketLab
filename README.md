@@ -382,7 +382,7 @@ MarketLab/
 
 ##  Changelog
 
-Full history in [`SYSTEM_RELEASE_HISTORY.md`](./SYSTEM_RELEASE_HISTORY.md).
+Full history in [`SYSTEM_RELEASE_HISTORY.md`](SYSTEM_RELEASE_HISTORY.md).
 
 **v3.1.0** — Signal Filters + CLI Refactor
 - Refactored `main.py` into a clean 5-mode interactive CLI
@@ -403,7 +403,7 @@ Full history in [`SYSTEM_RELEASE_HISTORY.md`](./SYSTEM_RELEASE_HISTORY.md).
 
 ## Contributing
 
-Contributions are welcome. Please read [`CONTRIBUTING.md`](CONTRIBUTING.md) before opening a pull request.
+Contributions are welcome. Please read [`CONTRIBUTING.md`](docs/CONTRIBUTING.md) before opening a pull request.
 
 ```bash
 git checkout -b feature/your-feature-name
@@ -413,7 +413,7 @@ git checkout -b feature/your-feature-name
 
 ## License
 
-Licensed under the **Apache License 2.0** — see [`LICENSE`](LICENSE) for details.
+Licensed under the **Apache License 2.0** — see [`LICENSE`](docs/LICENSE) for details.
 
 ---
 
