@@ -25,7 +25,6 @@ def calculate_atr(df: pd.DataFrame, period: int = 14) -> float:
         return float(close[-1] * 0.02)  
     return float(np.mean(tr[-period:]))
 
-
 # ─── ADX CALCULATOR ───────────────────────────────────────────────────────────
 
 def calculate_adx(df: pd.DataFrame, period: int = 14) -> float:
