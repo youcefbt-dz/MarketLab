@@ -47,7 +47,6 @@ OPTIMIZATION_BASKET = [
 END_DATE = datetime.today().strftime("%Y-%m-%d")
 
 # ─── PARAMETER SEARCH SPACE ───────────────────────────────────────────────────
-# Each entry: (type, low, high, step)   type = "int" | "float"
 
 SEARCH_SPACE: dict[str, tuple] = {
     # Signal thresholds
