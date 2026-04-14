@@ -286,51 +286,6 @@ Executive summary generated with ReportLab on every portfolio analysis run:
 
 ---
 
-##  Project Structure
-
-```
-MarketLab/
-│
-├── main.py                         Entry point — 5-mode interactive CLI
-│
-├── core/
-│   ├── signals.py                  Signal engine — 13 rules, ATR exits, regime filter
-│   ├── sentiment.py                NLP sentiment — VADER + financial keyword booster
-│   ├── stock_warehouse.py          Local data warehouse — 250+ symbols, smart sync
-│   └── crypto_warehouse.py         Crypto data layer
-│
-├── analysis/
-│   ├── backtest.py                 Walk-forward backtesting engine
-│   ├── backtest_logger.py          Black Box Logger + reliability score
-│   ├── batch_backtest.py           Batch runner for ML training data generation
-│   ├── ml_predictor.py             XGBoost signal quality predictor (+ SMOTE)
-│   ├── strategy_optimizer.py       Bayesian parameter optimizer — Optuna, 26 params
-│   └── watchlist_scanner.py        Parallel 250+ ticker scanner
-│
-├── ui/
-│   └── report_generator.py         PDF report builder — ReportLab
-│
-├── config/
-│   ├── companies.json              240+ company name → ticker mappings
-│   ├── crypto_symbols.json
-│   └── requirements.txt
-│
-├── assets/
-│   └── logo.svg
-│
-├── data/                           Local CSV warehouse — gitignored
-│   ├── AAPL.csv
-│   ├── MSFT.csv
-│   └── _metadata.json
-│
-├── docs/screenshots/
-├── backtest_results/               Trade logs · equity curves · reports
-├── backtest_history.json           Accumulated backtest runs
-└── best_params.json                Latest optimizer output
-```
-
----
-
 ##  Dependencies
 
 | Package | Version | Purpose |
