@@ -698,10 +698,6 @@ def _run_optimizer() -> None:
             console.print(f"    [dim]{k:<28}[/dim] = [bold green]{v}[/]")
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# MODE 5 — Warehouse Manager
-# ═══════════════════════════════════════════════════════════════════════════════
-
 def _run_warehouse() -> None:
     _section("Mode 5 — Warehouse Manager")
     from stock_warehouse import weekly_update
