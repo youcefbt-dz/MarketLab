@@ -33,7 +33,6 @@
     overflow-x: hidden;
   }
 
-  /* Background texture */
   body::before {
     content: '';
     position: fixed; inset: 0;
@@ -59,7 +58,6 @@
     padding: 40px 20px 60px;
   }
 
-  /* Header */
   .header {
     text-align: center;
     margin-bottom: 50px;
@@ -88,9 +86,7 @@
     margin-bottom: 8px;
   }
 
-  .header h1 span {
-    color: var(--gold);
-  }
+  .header h1 span { color: var(--gold); }
 
   .header p {
     color: rgba(245,240,232,0.5);
@@ -123,7 +119,6 @@
     transform: rotate(45deg);
   }
 
-  /* Card */
   .card {
     background: linear-gradient(145deg, var(--navy-mid), var(--navy-light));
     border: 1px solid rgba(201,168,76,0.2);
@@ -173,15 +168,9 @@
     margin-top: 1px;
   }
 
-  /* Table */
-  .table-wrap {
-    overflow-x: auto;
-  }
+  .table-wrap { overflow-x: auto; }
 
-  table {
-    width: 100%;
-    border-collapse: collapse;
-  }
+  table { width: 100%; border-collapse: collapse; }
 
   thead th {
     background: rgba(201,168,76,0.08);
@@ -195,9 +184,7 @@
     white-space: nowrap;
   }
 
-  thead th:first-child {
-    text-align: right;
-  }
+  thead th:first-child { text-align: right; }
 
   tbody tr {
     border-bottom: 1px solid rgba(255,255,255,0.04);
@@ -205,10 +192,7 @@
   }
 
   tbody tr:last-child { border-bottom: none; }
-
-  tbody tr:hover {
-    background: rgba(201,168,76,0.04);
-  }
+  tbody tr:hover { background: rgba(201,168,76,0.04); }
 
   tbody td {
     padding: 12px 18px;
@@ -238,7 +222,6 @@
     font-weight: 700;
   }
 
-  /* Inputs */
   .grade-input {
     width: 72px;
     background: rgba(13,27,42,0.7);
@@ -275,12 +258,12 @@
     color: var(--danger);
   }
 
-  .dash-cell {
-    color: rgba(245,240,232,0.2);
-    font-size: 18px;
+  /* Empty input = treated as 0, shown with dim red border */
+  .grade-input.zero-default {
+    border-color: rgba(224,92,92,0.3);
+    color: rgba(245,240,232,0.3);
   }
 
-  /* Module moyenne cell */
   .mod-avg {
     font-weight: 700;
     font-size: 14px;
@@ -288,14 +271,10 @@
     min-width: 50px;
   }
 
-  .mod-avg.computed {
-    color: var(--cream);
-  }
-
+  .mod-avg.computed { color: var(--cream); }
   .mod-avg.pass { color: var(--success); }
   .mod-avg.fail { color: var(--danger); }
 
-  /* Result panel */
   .result-panel {
     background: linear-gradient(145deg, var(--navy-mid), var(--navy-light));
     border: 1px solid rgba(201,168,76,0.25);
@@ -334,11 +313,7 @@
     transition: all 0.4s cubic-bezier(.34,1.56,.64,1);
   }
 
-  .result-value.has-value {
-    color: var(--gold);
-    text-shadow: 0 0 40px rgba(201,168,76,0.3);
-  }
-
+  .result-value.has-value { color: var(--gold); text-shadow: 0 0 40px rgba(201,168,76,0.3); }
   .result-value.pass { color: var(--success); text-shadow: 0 0 40px rgba(76,175,132,0.3); }
   .result-value.fail { color: var(--danger); text-shadow: 0 0 40px rgba(224,92,92,0.3); }
 
@@ -371,7 +346,6 @@
     transition: width 0.6s cubic-bezier(.34,1.56,.64,1);
   }
 
-  /* Buttons */
   .btn-row {
     display: flex;
     gap: 12px;
@@ -421,7 +395,6 @@
 
   .btn:active { transform: scale(0.97); }
 
-  /* Footer note */
   .note {
     text-align: center;
     font-size: 11px;
@@ -430,7 +403,16 @@
     animation: fadeUp 0.6s 0.5s ease both;
   }
 
-  /* Animations */
+  /* Zero-mode info badge */
+  .zero-info {
+    text-align: center;
+    font-size: 11px;
+    color: rgba(224,92,92,0.5);
+    margin-top: 10px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+
   @keyframes fadeDown {
     from { opacity: 0; transform: translateY(-24px); }
     to   { opacity: 1; transform: translateY(0); }
@@ -441,12 +423,6 @@
     to   { opacity: 1; transform: translateY(0); }
   }
 
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-  }
-
-  /* Responsive */
   @media (max-width: 600px) {
     .container { padding: 24px 12px 48px; }
     .card-header { padding: 14px 16px; }
@@ -460,7 +436,6 @@
 
 <div class="container">
 
-  <!-- Header -->
   <header class="header">
     <div class="header-badge">حاسبة المعدل</div>
     <h1>السداسي <span>السادس</span></h1>
@@ -469,10 +444,10 @@
       <div class="ornament-diamond"></div>
       <div class="ornament-line flip"></div>
     </div>
-    <p>أدخل علاماتك لحساب المعدل تلقائياً</p>
+    <p>أدخل علاماتك لحساب المعدل — الخانات الفارغة تُحسب كـ <strong style="color:var(--danger)">0</strong></p>
   </header>
 
-  <!-- Matières normales (TD + Examen) -->
+  <!-- المواد الرئيسية -->
   <div class="card">
     <div class="card-header">
       <div class="card-header-icon">📚</div>
@@ -496,51 +471,51 @@
           <tr data-coef="2">
             <td>إدارة استراتيجية</td>
             <td><span class="coef-badge">2</span></td>
-            <td><input type="number" class="grade-input td-input" min="0" max="20" step="0.25" placeholder="—" oninput="updateRow(this)"></td>
-            <td><input type="number" class="grade-input exam-input" min="0" max="20" step="0.25" placeholder="—" oninput="updateRow(this)"></td>
-            <td class="mod-avg" id="avg-0">—</td>
+            <td><input type="number" class="grade-input td-input" min="0" max="20" step="0.25" placeholder="0" oninput="updateRow(this)"></td>
+            <td><input type="number" class="grade-input exam-input" min="0" max="20" step="0.25" placeholder="0" oninput="updateRow(this)"></td>
+            <td class="mod-avg" id="avg-0">0.00</td>
           </tr>
           <tr data-coef="2">
             <td>التدقيق المالي</td>
             <td><span class="coef-badge">2</span></td>
-            <td><input type="number" class="grade-input td-input" min="0" max="20" step="0.25" placeholder="—" oninput="updateRow(this)"></td>
-            <td><input type="number" class="grade-input exam-input" min="0" max="20" step="0.25" placeholder="—" oninput="updateRow(this)"></td>
-            <td class="mod-avg" id="avg-1">—</td>
+            <td><input type="number" class="grade-input td-input" min="0" max="20" step="0.25" placeholder="0" oninput="updateRow(this)"></td>
+            <td><input type="number" class="grade-input exam-input" min="0" max="20" step="0.25" placeholder="0" oninput="updateRow(this)"></td>
+            <td class="mod-avg" id="avg-1">0.00</td>
           </tr>
           <tr data-coef="2">
             <td>مراقبة التسيير</td>
             <td><span class="coef-badge">2</span></td>
-            <td><input type="number" class="grade-input td-input" min="0" max="20" step="0.25" placeholder="—" oninput="updateRow(this)"></td>
-            <td><input type="number" class="grade-input exam-input" min="0" max="20" step="0.25" placeholder="—" oninput="updateRow(this)"></td>
-            <td class="mod-avg" id="avg-2">—</td>
+            <td><input type="number" class="grade-input td-input" min="0" max="20" step="0.25" placeholder="0" oninput="updateRow(this)"></td>
+            <td><input type="number" class="grade-input exam-input" min="0" max="20" step="0.25" placeholder="0" oninput="updateRow(this)"></td>
+            <td class="mod-avg" id="avg-2">0.00</td>
           </tr>
           <tr data-coef="2">
             <td>إدارة مصادر التمويل</td>
             <td><span class="coef-badge">2</span></td>
-            <td><input type="number" class="grade-input td-input" min="0" max="20" step="0.25" placeholder="—" oninput="updateRow(this)"></td>
-            <td><input type="number" class="grade-input exam-input" min="0" max="20" step="0.25" placeholder="—" oninput="updateRow(this)"></td>
-            <td class="mod-avg" id="avg-3">—</td>
+            <td><input type="number" class="grade-input td-input" min="0" max="20" step="0.25" placeholder="0" oninput="updateRow(this)"></td>
+            <td><input type="number" class="grade-input exam-input" min="0" max="20" step="0.25" placeholder="0" oninput="updateRow(this)"></td>
+            <td class="mod-avg" id="avg-3">0.00</td>
           </tr>
           <tr data-coef="2">
             <td>جباية المؤسسة</td>
             <td><span class="coef-badge">2</span></td>
-            <td><input type="number" class="grade-input td-input" min="0" max="20" step="0.25" placeholder="—" oninput="updateRow(this)"></td>
-            <td><input type="number" class="grade-input exam-input" min="0" max="20" step="0.25" placeholder="—" oninput="updateRow(this)"></td>
-            <td class="mod-avg" id="avg-4">—</td>
+            <td><input type="number" class="grade-input td-input" min="0" max="20" step="0.25" placeholder="0" oninput="updateRow(this)"></td>
+            <td><input type="number" class="grade-input exam-input" min="0" max="20" step="0.25" placeholder="0" oninput="updateRow(this)"></td>
+            <td class="mod-avg" id="avg-4">0.00</td>
           </tr>
           <tr data-coef="2">
             <td>تحليل البيانات</td>
             <td><span class="coef-badge">2</span></td>
-            <td><input type="number" class="grade-input td-input" min="0" max="20" step="0.25" placeholder="—" oninput="updateRow(this)"></td>
-            <td><input type="number" class="grade-input exam-input" min="0" max="20" step="0.25" placeholder="—" oninput="updateRow(this)"></td>
-            <td class="mod-avg" id="avg-5">—</td>
+            <td><input type="number" class="grade-input td-input" min="0" max="20" step="0.25" placeholder="0" oninput="updateRow(this)"></td>
+            <td><input type="number" class="grade-input exam-input" min="0" max="20" step="0.25" placeholder="0" oninput="updateRow(this)"></td>
+            <td class="mod-avg" id="avg-5">0.00</td>
           </tr>
         </tbody>
       </table>
     </div>
   </div>
 
-  <!-- Matières avec note unique -->
+  <!-- المواد ذات العلامة الواحدة -->
   <div class="card">
     <div class="card-header">
       <div class="card-header-icon">📝</div>
@@ -564,34 +539,33 @@
             <td>مشروع تخرج ليسانس</td>
             <td><span class="coef-badge">2</span></td>
             <td colspan="2" style="text-align:center">
-              <input type="number" class="grade-input single-input" min="0" max="20" step="0.25" placeholder="—" oninput="updateSingleRow(this)">
+              <input type="number" class="grade-input single-input" min="0" max="20" step="0.25" placeholder="0" oninput="updateSingleRow(this)">
             </td>
-            <td class="mod-avg" id="avg-6">—</td>
+            <td class="mod-avg" id="avg-6">0.00</td>
           </tr>
           <tr data-coef="1" data-type="single">
             <td>لغة أجنبية (فرنسية)</td>
             <td><span class="coef-badge">1</span></td>
             <td colspan="2" style="text-align:center">
-              <input type="number" class="grade-input single-input" min="0" max="20" step="0.25" placeholder="—" oninput="updateSingleRow(this)">
+              <input type="number" class="grade-input single-input" min="0" max="20" step="0.25" placeholder="0" oninput="updateSingleRow(this)">
             </td>
-            <td class="mod-avg" id="avg-7">—</td>
+            <td class="mod-avg" id="avg-7">0.00</td>
           </tr>
         </tbody>
       </table>
     </div>
   </div>
 
-  <!-- Résultat -->
+  <!-- النتيجة -->
   <div class="result-panel">
     <div class="result-label">المعدل العام للسداسي السادس</div>
-    <div class="result-value" id="finalAvg">—</div>
-    <div class="result-mention" id="mention"></div>
+    <div class="result-value fail" id="finalAvg">0.00</div>
+    <div class="result-mention active" id="mention">❌ الراتراباج ينادي</div>
     <div class="result-bar">
-      <div class="result-bar-fill" id="resultBar"></div>
+      <div class="result-bar-fill" id="resultBar" style="width:0%;background:linear-gradient(90deg,#8b2e2e,#e05c5c)"></div>
     </div>
   </div>
 
-  <!-- Buttons -->
   <div class="btn-row">
     <button class="btn btn-primary" onclick="calculateAll()">
       ⚡ احسب المعدل
@@ -603,13 +577,13 @@
 
   <p class="note">
     معادلة المعدل: (أعمال موجهة × 0.4 + امتحان × 0.6) × المعامل ÷ مجموع المعاملات
-    <br>للمواد ذات العلامة الواحدة: النقطة × المعامل مباشرةً
+    <br>الخانات الفارغة تُعامل كـ 0 — كل المواد تدخل في الحساب دائماً
   </p>
 
 </div>
 
 <script>
-  // Modules: [id, coef, type]  type: 'normal' or 'single'
+  // مجموع المعاملات الكلي ثابت = 2×6 + 2 + 1 = 15
   const modules = [
     { id: 0, coef: 2, type: 'normal' },
     { id: 1, coef: 2, type: 'normal' },
@@ -621,107 +595,111 @@
     { id: 7, coef: 1, type: 'single' },
   ];
 
-  const moduleAvgs = {};  // store computed averages
+  const TOTAL_COEF = modules.reduce((s, m) => s + m.coef, 0); // 15
 
-  function validateInput(input) {
+  // الدالة المساعدة: تقرأ قيمة من input — إذا فارغة أو خطأ ترجع 0
+  function getVal(input) {
+    if (input.value === '') return 0;
     const v = parseFloat(input.value);
-    if (input.value === '') {
-      input.classList.remove('has-value', 'invalid');
-      return;
-    }
-    if (isNaN(v) || v < 0 || v > 20) {
-      input.classList.add('invalid');
-      input.classList.remove('has-value');
+    return (isNaN(v) || v < 0 || v > 20) ? null : v; // null = إدخال خاطئ
+  }
+
+  function styleInput(input) {
+    const raw = input.value;
+    input.classList.remove('has-value', 'invalid', 'zero-default');
+    if (raw === '') {
+      input.classList.add('zero-default'); // فارغ = يُحسب كـ 0، يُظهر كـ رمادي خفيف
     } else {
-      input.classList.remove('invalid');
-      input.classList.add('has-value');
+      const v = parseFloat(raw);
+      if (isNaN(v) || v < 0 || v > 20) {
+        input.classList.add('invalid');
+      } else {
+        input.classList.add('has-value');
+      }
     }
   }
 
   function updateRow(input) {
-    validateInput(input);
+    styleInput(input);
     const row = input.closest('tr');
-    const rowIndex = Array.from(row.parentNode.rows).indexOf(row);
-    const tdInput = row.querySelector('.td-input');
+    const tdInput  = row.querySelector('.td-input');
     const examInput = row.querySelector('.exam-input');
-    const td = parseFloat(tdInput.value);
-    const exam = parseFloat(examInput.value);
-
-    const avgCell = row.querySelector('.mod-avg');
+    const avgCell  = row.querySelector('.mod-avg');
     const id = parseInt(avgCell.id.split('-')[1]);
 
-    if (!isNaN(td) && !isNaN(exam) && td >= 0 && td <= 20 && exam >= 0 && exam <= 20) {
-      const avg = td * 0.4 + exam * 0.6;
-      moduleAvgs[id] = avg;
-      avgCell.textContent = avg.toFixed(2);
-      avgCell.className = 'mod-avg computed ' + (avg >= 10 ? 'pass' : 'fail');
-    } else {
-      delete moduleAvgs[id];
-      avgCell.textContent = '—';
-      avgCell.className = 'mod-avg';
+    const td   = getVal(tdInput);
+    const exam = getVal(examInput);
+
+    // إذا فيه إدخال خاطئ (خارج 0-20) لا نحسب
+    if (td === null || exam === null) {
+      avgCell.textContent = '!';
+      avgCell.className = 'mod-avg fail';
+      calculateAll();
+      return;
     }
+
+    // الخانات الفارغة = 0 بالفعل (getVal ترجع 0)
+    const avg = td * 0.4 + exam * 0.6;
+    avgCell.textContent = avg.toFixed(2);
+    avgCell.className = 'mod-avg computed ' + (avg >= 10 ? 'pass' : 'fail');
     calculateAll();
   }
 
   function updateSingleRow(input) {
-    validateInput(input);
+    styleInput(input);
     const row = input.closest('tr');
     const avgCell = row.querySelector('.mod-avg');
     const id = parseInt(avgCell.id.split('-')[1]);
-    const v = parseFloat(input.value);
+    const v = getVal(input);
 
-    if (!isNaN(v) && v >= 0 && v <= 20) {
-      moduleAvgs[id] = v;
-      avgCell.textContent = v.toFixed(2);
-      avgCell.className = 'mod-avg computed ' + (v >= 10 ? 'pass' : 'fail');
-    } else {
-      delete moduleAvgs[id];
-      avgCell.textContent = '—';
-      avgCell.className = 'mod-avg';
+    if (v === null) {
+      avgCell.textContent = '!';
+      avgCell.className = 'mod-avg fail';
+      calculateAll();
+      return;
     }
+
+    avgCell.textContent = v.toFixed(2);
+    avgCell.className = 'mod-avg computed ' + (v >= 10 ? 'pass' : 'fail');
     calculateAll();
+  }
+
+  function getModuleAvg(id) {
+    // يقرأ القيمة المعروضة في خلية المعدل
+    const cell = document.getElementById('avg-' + id);
+    const text = cell.textContent.trim();
+    if (text === '!' || text === '') return 0; // خطأ في الإدخال → 0
+    const v = parseFloat(text);
+    return isNaN(v) ? 0 : v;
   }
 
   function calculateAll() {
     let totalWeighted = 0;
-    let totalCoef = 0;
 
     modules.forEach(m => {
-      if (moduleAvgs[m.id] !== undefined) {
-        totalWeighted += moduleAvgs[m.id] * m.coef;
-        totalCoef += m.coef;
-      }
+      const avg = getModuleAvg(m.id);
+      totalWeighted += avg * m.coef;
     });
+
+    const avg = totalWeighted / TOTAL_COEF;
 
     const finalEl = document.getElementById('finalAvg');
     const mentionEl = document.getElementById('mention');
     const barEl = document.getElementById('resultBar');
 
-    if (totalCoef === 0) {
-      finalEl.textContent = '—';
-      finalEl.className = 'result-value';
-      mentionEl.textContent = '';
-      mentionEl.className = 'result-mention';
-      barEl.style.width = '0%';
-      return;
-    }
-
-    const avg = totalWeighted / totalCoef;
     finalEl.textContent = avg.toFixed(2);
-    finalEl.className = 'result-value has-value ' + (avg >= 10 ? 'pass' : 'fail');
+    finalEl.className = 'result-value ' + (avg >= 10 ? 'pass' : 'fail');
 
-    // Mention
     let mention = '';
-    if (avg >= 16)      mention = '🏆 ممتاز';
-    else if (avg >= 14) mention = '⭐ جيد جداً';
+    if (avg >= 16)      mention = '🏆 خباش';
+    else if (avg >= 14) mention = '⭐ خباش';
     else if (avg >= 12) mention = '✅ خباش';
-    else if (avg >= 10) mention = '✔️ اووو خباش كبير';
+    else if (avg >= 10) mention = '✔️ خباش';
     else                mention = '❌ الراتراباج ينادي';
 
     mentionEl.textContent = mention;
     mentionEl.className = 'result-mention active';
 
-    // Bar
     barEl.style.width = Math.min(avg / 20 * 100, 100) + '%';
     barEl.style.background = avg >= 10
       ? 'linear-gradient(90deg, #2e8b57, #4caf84)'
@@ -731,21 +709,33 @@
   function resetAll() {
     document.querySelectorAll('.grade-input').forEach(i => {
       i.value = '';
-      i.className = 'grade-input ' + (i.classList.contains('td-input') ? 'td-input' : i.classList.contains('exam-input') ? 'exam-input' : 'single-input');
+      i.className = 'grade-input ' + (
+        i.classList.contains('td-input')   ? 'td-input zero-default' :
+        i.classList.contains('exam-input') ? 'exam-input zero-default' :
+                                             'single-input zero-default'
+      );
     });
-    document.querySelectorAll('.mod-avg').forEach(c => {
-      c.textContent = '—';
-      c.className = 'mod-avg';
-    });
-    Object.keys(moduleAvgs).forEach(k => delete moduleAvgs[k]);
 
-    const finalEl = document.getElementById('finalAvg');
-    finalEl.textContent = '—';
-    finalEl.className = 'result-value';
-    document.getElementById('mention').textContent = '';
-    document.getElementById('mention').className = 'result-mention';
+    // إعادة خلايا المعدل للصفر
+    modules.forEach(m => {
+      const cell = document.getElementById('avg-' + m.id);
+      cell.textContent = '0.00';
+      cell.className = 'mod-avg computed fail';
+    });
+
+    // إعادة النتيجة
+    document.getElementById('finalAvg').textContent = '0.00';
+    document.getElementById('finalAvg').className = 'result-value fail';
+    document.getElementById('mention').textContent = '❌ الراتراباج ينادي';
+    document.getElementById('mention').className = 'result-mention active';
     document.getElementById('resultBar').style.width = '0%';
+    document.getElementById('resultBar').style.background = 'linear-gradient(90deg,#8b2e2e,#e05c5c)';
   }
+
+  // تهيئة: أظهر صفر من البداية
+  document.querySelectorAll('.grade-input').forEach(i => {
+    i.classList.add('zero-default');
+  });
 </script>
 </body>
 </html>
