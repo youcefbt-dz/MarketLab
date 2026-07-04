@@ -1,9 +1,16 @@
-<div align="center">
+markdown<div align="center">
 
 <img src="assets/logo.svg" alt="MarketLab" width="380"/>
 
 <br/><br/>
 
+> [!WARNING]
+> ### 🚧 This repository is no longer actively maintained
+> This version of MarketLab is an earlier prototype. A complete rebuild — with a live web platform, a proper data-preprocessing pipeline, and an expanded backtesting engine — is currently in development.
+>
+> This version is kept public for historical reference only.
+
+<br/>
 <p>
   <img src="https://img.shields.io/badge/version-3.1.0-0F172A?style=flat-square&labelColor=0F172A&color=F59E0B" alt="Version"/>
   &nbsp;
