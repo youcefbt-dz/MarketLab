@@ -4,12 +4,15 @@ markdown<div align="center">
 
 <br/><br/>
 
-> [!WARNING]
-> ### 🚧 This repository is no longer actively maintained
-> This version of MarketLab is an earlier prototype. A complete rebuild — with a live web platform, a proper data-preprocessing pipeline, and an expanded backtesting engine — is currently in development.
->
-> This version is kept public for historical reference only.
-
+> [!IMPORTANT]
+> ### 🌐 MarketLab has evolved into a Live Web Platform
+> This repository contains an earlier offline prototype kept public for historical and research reference only. **It is no longer actively maintained.**
+> 
+> The platform has been completely rebuilt from the ground up as a live web application featuring an interactive data-preprocessing pipeline, an expanded backtesting engine, and sustainable finance insights.
+> 
+>  *Note: The next-generation platform is now a proprietary product and is no longer open-source.*
+> 
+>  **Access the live platform here:** [marketlab-live.onrender.com](https://marketlab-live.onrender.com/)
 <br/>
 <p>
   <img src="https://img.shields.io/badge/version-3.1.0-0F172A?style=flat-square&labelColor=0F172A&color=F59E0B" alt="Version"/>
